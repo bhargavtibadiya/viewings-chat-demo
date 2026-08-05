@@ -11,7 +11,10 @@ export const GREETING_ACK =
 
 export const THANKS_ACK = "You're welcome. Happy to help with anything else about this property.";
 
-export type InputScopeClass = 'allow' | 'refuse' | 'greeting' | 'thanks';
+export const UNCLEAR_ACK =
+  "Sorry, I don't quite get that. Could you rephrase your question about this property?";
+
+export type InputScopeClass = 'allow' | 'refuse' | 'greeting' | 'thanks' | 'unclear';
 
 const JAILBREAK_PATTERNS: RegExp[] = [
   /\b(ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above|earlier|your)\s+(?:instructions?|prompts?|rules?|system\s+message)/i,
@@ -50,6 +53,20 @@ const GREETING_PATTERN =
 const THANKS_PATTERN =
   /^(thanks|thank\s+you|cheers|ta|much\s+appreciated)[\s!.]*$/i;
 
+const PROPERTY_QUESTION_PATTERNS: RegExp[] = [
+  /\b(?:bedroom|bedrooms|beds?|bathroom|bathrooms|baths?|ensuite|toilet)\b/i,
+  /\b(?:rent|bond|price|deposit|weekly\s+rent|asking\s+price)\b/i,
+  /\b(?:pets?|dogs?|cats?|parking|garage|car\s*park)\b/i,
+  /\b(?:viewing|open\s+home|availability|available\s+from|move[\s-]?in|book(?:ing)?)\b/i,
+  /\b(?:fibre|fiber|internet|wifi|wi-?fi|broadband)\b/i,
+  /\b(?:floor\s+area|sqm|square\s+metr|land\s+area|section\s+size)\b/i,
+  /\b(?:council\s+rates|body\s+corporate|rates|utilities|inclusions?)\b/i,
+  /\b(?:furnish(?:ed|ing)?|heating|insulation|heat\s+pump|air\s+cond)\b/i,
+  /\b(?:suburb|address|location|lift|elevator|accessib|wheelchair|step[\s-]?free)\b/i,
+  /\b(?:outdoor|yard|fencing|bbq|balcony|deck|garden)\b/i,
+  /\b(?:this\s+)?(?:property|listing|house|apartment|flat|townhouse|villa)\b/i,
+];
+
 const CODE_FENCE_PATTERN = /```/;
 
 const DENSE_CODE_LINE =
@@ -57,7 +74,7 @@ const DENSE_CODE_LINE =
 
 /**
  * Classify user input before calling the LLM.
- * `refuse` / `greeting` / `thanks` should short-circuit without tools.
+ * `refuse` / `greeting` / `thanks` / `unclear` should short-circuit without tools.
  */
 export function classifyInputScope(input: string): InputScopeClass {
   const trimmed = input.trim();
@@ -73,8 +90,16 @@ export function classifyInputScope(input: string): InputScopeClass {
     return 'thanks';
   }
 
-  if (looksLikeJailbreak(trimmed) || looksLikeCodeOrOffTopicRequest(trimmed)) {
+  if (looksLikeJailbreak(trimmed)) {
     return 'refuse';
+  }
+
+  if (looksLikeCodeOrOffTopicRequest(trimmed) && !looksLikePropertyQuestion(trimmed)) {
+    return 'refuse';
+  }
+
+  if (looksLikeUnclearInput(trimmed)) {
+    return 'unclear';
   }
 
   return 'allow';
@@ -84,11 +109,75 @@ export function looksLikeJailbreak(input: string): boolean {
   return JAILBREAK_PATTERNS.some((pattern) => pattern.test(input));
 }
 
+export function looksLikePropertyQuestion(input: string): boolean {
+  return PROPERTY_QUESTION_PATTERNS.some((pattern) => pattern.test(input));
+}
+
 export function looksLikeCodeOrOffTopicRequest(input: string): boolean {
   return (
     CODE_REQUEST_PATTERNS.some((pattern) => pattern.test(input)) ||
     OFF_TOPIC_PATTERNS.some((pattern) => pattern.test(input))
   );
+}
+
+/**
+ * Detect keyboard-mash / gibberish / punctuation-only noise.
+ * Short legitimate tokens (pets, bond, wifi, hi) must not match.
+ */
+export function looksLikeUnclearInput(input: string): boolean {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  if (looksLikePropertyQuestion(trimmed)) {
+    return false;
+  }
+
+  // Punctuation / symbol-only noise ("???", "...", "!!!")
+  if (/^[^a-zA-Z0-9]+$/.test(trimmed)) {
+    return true;
+  }
+
+  const letters = (trimmed.match(/[a-zA-Z]/g) || []).join('');
+  // Keep short messages out of the gibberish path (pets?, bond, wifi, ok, hmm).
+  if (letters.length < 6) {
+    return false;
+  }
+
+  const compact = trimmed.replace(/\s+/g, '');
+  const letterOnly = letters.toLowerCase();
+  // Long runs of the same character (aaaaa, hhhhh)
+  if (/(.)\1{4,}/i.test(compact)) {
+    return true;
+  }
+
+  // Repeated short chunks: asdasdasd (asd×3), blahblah (blah×2)
+  if (/^(.{2,5})\1+$/i.test(letterOnly)) {
+    return true;
+  }
+
+  const vowelCount = (letters.match(/[aeiouAEIOU]/g) || []).length;
+  const vowelRatio = vowelCount / letters.length;
+  const hasWhitespace = /\s/.test(trimmed);
+  const uniqueRatio = new Set(letterOnly).size / letterOnly.length;
+
+  // Single-token mash with very few distinct letters (asdasdasd, qqqwwwee)
+  if (!hasWhitespace && letters.length >= 8 && uniqueRatio <= 0.4) {
+    return true;
+  }
+
+  // Consonant mash with almost no vowels (fghfggfghfh, asdfghjkl)
+  if (vowelRatio <= 0.2 && letters.length >= 8) {
+    return true;
+  }
+
+  // Slightly shorter no-space mashes (e.g. "sdfghj")
+  if (!hasWhitespace && vowelRatio < 0.15 && letters.length >= 6) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -135,6 +224,8 @@ export function cannedReplyForScope(scope: InputScopeClass): string | null {
       return GREETING_ACK;
     case 'thanks':
       return THANKS_ACK;
+    case 'unclear':
+      return UNCLEAR_ACK;
     default:
       return null;
   }
