@@ -3,7 +3,7 @@ import prisma from '../../config/prisma.js';
 import { createServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';
 import { formatNzDateTime } from '../../utils/helpers/date.js';
-import type { CreateBookingDtoType } from './dto/bookings.dto.js';
+import type { CreateBookingDtoType, ResolvedCreateBookingDto } from './dto/bookings.dto.js';
 import type { CreateBookingResult, SafeBooking } from './types/bookings.types.js';
 
 type BookingWithRelations = Booking & {
@@ -45,11 +45,41 @@ export class BookingsService {
     };
   }
 
+  async resolveContactFromUser(
+    userId: string,
+    dto: CreateBookingDtoType,
+  ): Promise<ResolvedCreateBookingDto> {
+    if (dto.contactName && dto.contactEmail) {
+      return {
+        ...dto,
+        contactName: dto.contactName,
+        contactEmail: dto.contactEmail,
+      };
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { id: userId, ...notDeleted() },
+      select: { name: true, email: true },
+    });
+
+    if (!user) {
+      throw createServiceError(404, 'User not found');
+    }
+
+    return {
+      ...dto,
+      contactName: dto.contactName ?? user.name,
+      contactEmail: dto.contactEmail ?? user.email,
+    };
+  }
+
   async createBooking(userId: string, dto: CreateBookingDtoType): Promise<CreateBookingResult> {
+    const resolved = await this.resolveContactFromUser(userId, dto);
+
     const slot = await prisma.availabilitySlot.findFirst({
       where: {
-        id: dto.slotId,
-        propertyId: dto.propertyId,
+        id: resolved.slotId,
+        propertyId: resolved.propertyId,
         ...notDeleted(),
       },
     });
@@ -64,7 +94,7 @@ export class BookingsService {
 
     const booking = await prisma.$transaction(async (tx) => {
       const lockedSlot = await tx.availabilitySlot.findFirst({
-        where: { id: dto.slotId, isBooked: false, ...notDeleted() },
+        where: { id: resolved.slotId, isBooked: false, ...notDeleted() },
       });
 
       if (!lockedSlot) {
@@ -73,19 +103,19 @@ export class BookingsService {
 
       const created = await tx.booking.create({
         data: {
-          propertyId: dto.propertyId,
+          propertyId: resolved.propertyId,
           userId,
-          slotId: dto.slotId,
-          contactName: dto.contactName,
-          contactEmail: dto.contactEmail,
-          contactPhone: dto.contactPhone,
-          notes: dto.notes,
+          slotId: resolved.slotId,
+          contactName: resolved.contactName,
+          contactEmail: resolved.contactEmail,
+          contactPhone: resolved.contactPhone,
+          notes: resolved.notes,
         },
         include: this.bookingInclude(),
       });
 
       await tx.availabilitySlot.update({
-        where: { id: dto.slotId },
+        where: { id: resolved.slotId },
         data: { isBooked: true },
       });
 
