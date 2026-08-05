@@ -13,6 +13,8 @@ import type {
   ISendMessageThunkResponse,
   IAskListerThunkPayload,
   IAskListerThunkResponse,
+  IBookSlotThunkPayload,
+  IBookSlotThunkResponse,
 } from '@/store/chat/chat.types';
 import { getMessagesFetchKey, CHAT_MESSAGES_DEFAULT_LIMIT } from '@/store/chat/chat.types';
 
@@ -117,5 +119,32 @@ export const askListerThunk = createAsyncThunk<
   },
   {
     condition: (_, { getState }) => !getState().chat.askListerLoading,
+  },
+);
+
+export const bookSlotThunk = createAsyncThunk<
+  IBookSlotThunkResponse,
+  IBookSlotThunkPayload,
+  { rejectValue: ApiErrorData; state: RootState }
+>(
+  'chat/bookSlot',
+  async (data, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await chatService.bookSlot(data);
+      await dispatch(
+        getMessagesThunk({
+          sessionId: data.sessionId,
+          limit: CHAT_MESSAGES_DEFAULT_LIMIT,
+          skipCache: true,
+        }),
+      );
+      return response.data;
+    } catch (error: unknown) {
+      const fallback = getErrorMessage(error, 'Failed to book viewing');
+      return rejectWithValue({ data: extractApiError(error, fallback) });
+    }
+  },
+  {
+    condition: (_, { getState }) => !getState().chat.bookSlotLoading,
   },
 );

@@ -62,8 +62,15 @@ export interface IAskListerThunkPayload {
   canonicalAttributes?: string[];
 }
 
+export interface IBookSlotThunkPayload {
+  sessionId: string;
+  slotId: string;
+  label?: string;
+}
+
 export type ISendMessageThunkResponse = ApiSuccessResponse<IChatTurnResponse>;
 export type IAskListerThunkResponse = ApiSuccessResponse<IChatTurnResponse>;
+export type IBookSlotThunkResponse = ApiSuccessResponse<IChatTurnResponse>;
 
 export interface ChatSliceInterface {
   getSessionLoading: boolean;
@@ -81,6 +88,9 @@ export interface ChatSliceInterface {
   sendMessageError: string | null;
   askListerLoading: boolean;
   askListerError: string | null;
+  bookSlotLoading: boolean;
+  bookSlotId: string | null;
+  bookSlotError: string | null;
   lastTurn: IChatTurnResponse | null;
   showDebugStrip: boolean;
 }

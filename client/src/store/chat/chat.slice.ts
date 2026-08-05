@@ -1,5 +1,11 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { getMessagesThunk, getSessionThunk, sendMessageThunk, askListerThunk } from '@/store/chat/chat.thunk';
+import {
+  getMessagesThunk,
+  getSessionThunk,
+  sendMessageThunk,
+  askListerThunk,
+  bookSlotThunk,
+} from '@/store/chat/chat.thunk';
 import type { ChatSliceInterface, IChatMessagesPagination, ISessionMessagesCache } from '@/store/chat/chat.types';
 import {
   CHAT_MESSAGES_FETCH_INITIAL_KEY,
@@ -24,6 +30,9 @@ const initialState: ChatSliceInterface = {
   sendMessageError: null,
   askListerLoading: false,
   askListerError: null,
+  bookSlotLoading: false,
+  bookSlotId: null,
+  bookSlotError: null,
   lastTurn: null,
   showDebugStrip: false,
 };
@@ -260,6 +269,25 @@ const chatSlice = createSlice({
         ...state,
         askListerLoading: false,
         askListerError: action.payload?.data.message ?? 'Failed to send question to lister',
+      }))
+      .addCase(bookSlotThunk.pending, (state, action) => ({
+        ...state,
+        bookSlotLoading: true,
+        bookSlotId: action.meta.arg.slotId,
+        bookSlotError: null,
+      }))
+      .addCase(bookSlotThunk.fulfilled, (state, action) => ({
+        ...state,
+        bookSlotLoading: false,
+        bookSlotId: null,
+        bookSlotError: null,
+        lastTurn: action.payload.data,
+      }))
+      .addCase(bookSlotThunk.rejected, (state, action) => ({
+        ...state,
+        bookSlotLoading: false,
+        bookSlotId: null,
+        bookSlotError: action.payload?.data.message ?? 'Failed to book viewing',
       }));
   },
 });
