@@ -9,6 +9,9 @@ import type {
   SessionMemoryResponse,
 } from './types/chat.types.js';
 import { sendCreated, sendSuccess, sendBadRequest } from '../../utils/helpers/response.js';
+import { createLogger } from '../../utils/helpers/logger.js';
+
+const logger = createLogger('ChatController');
 
 export class ChatController {
   private chatService: ChatService;
@@ -30,6 +33,7 @@ export class ChatController {
         return;
       }
 
+      logger.info(`getOrCreateSession user=${req.user.id} propertyId=${propertyId}`);
       const session = await this.chatService.getOrCreateSession(req.user.id, propertyId);
       sendSuccess<{ session: SafeChatSession }>(res, 'Chat session ready', { session });
     } catch (error) {
@@ -111,10 +115,16 @@ export class ChatController {
       }
 
       const dto: PostMessageDtoType = dtoResult.data;
+      logger.info(
+        `postMessage user=${req.user.id} sessionId=${sessionId} contentPreview=${dto.content.slice(0, 80)}`,
+      );
       const result = await this.chatService.postMessage(req.user.id, sessionId, dto);
 
       sendCreated<ChatTurnResponse>(res, 'Assistant response ready', result);
     } catch (error) {
+      logger.warn(
+        `postMessage failed sessionId=${req.params.sessionId}: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
       next(error);
     }
   };

@@ -29,6 +29,7 @@ import {
 import { listerService } from '../lister/lister.service.js';
 import type { ChatAction } from '../../services/ai/types/ai.types.js';
 import { enrichListerQuestion } from '../../services/ai/helpers/enrichListerQuestion.js';
+import { ALREADY_ASKED_LISTER_REPLY } from '../../services/ai/helpers/openListerQuestions.js';
 import { createLogger } from '../../utils/helpers/logger.js';
 
 const logger = createLogger('ChatService');
@@ -192,8 +193,15 @@ export class ChatService {
     });
 
     if (!property) {
+      logger.warn(
+        `postMessage property missing sessionId=${sessionId} propertyId=${session.propertyId} userId=${userId}`,
+      );
       throw createServiceError(404, 'Property not found');
     }
+
+    logger.info(
+      `postMessage start sessionId=${sessionId} propertyId=${property.id} title="${property.title}"`,
+    );
 
     const userMessage = await prisma.chatMessage.create({
       data: {
@@ -314,9 +322,15 @@ export class ChatService {
       canonicalAttributes: dto.canonicalAttributes,
     });
 
-    const assistantContent = escalation.delivered
-      ? 'I have sent your question to the lister. They will review it and publish an approved answer when ready.'
-      : 'I could not deliver your question to the lister. Please try again shortly.';
+    let assistantContent: string;
+    if (escalation.alreadyAsked) {
+      assistantContent = ALREADY_ASKED_LISTER_REPLY;
+    } else if (escalation.delivered) {
+      assistantContent =
+        'I have sent your question to the lister. They will review it and publish an approved answer when ready.';
+    } else {
+      assistantContent = 'I could not deliver your question to the lister. Please try again shortly.';
+    }
 
     const assistantMessage = await prisma.chatMessage.create({
       data: {
