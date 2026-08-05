@@ -21,6 +21,7 @@ export const ROUTES = {
     POST_MESSAGE: '/sessions/:sessionId/messages',
     ASK_LISTER: '/sessions/:sessionId/ask-lister',
     GET_SESSION_MEMORY: '/sessions/:sessionId/memory',
+    BOOK_SLOT: '/sessions/:sessionId/book',
   },
   BOOKINGS: {
     BASE: '/api/bookings',

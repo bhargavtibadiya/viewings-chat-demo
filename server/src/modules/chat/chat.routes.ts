@@ -63,4 +63,16 @@ router.post(
   chatController.askLister,
 );
 
+/**
+ * @route   POST /api/chat/sessions/:sessionId/book
+ * @desc    Book a viewing slot from chat using the authenticated user profile
+ * @access  Protected
+ */
+router.post(
+  ROUTES.CHAT.BOOK_SLOT,
+  authenticate,
+  chatLimiter,
+  chatController.bookSlot,
+);
+
 export default router;

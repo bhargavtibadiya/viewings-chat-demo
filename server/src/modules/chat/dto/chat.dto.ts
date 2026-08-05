@@ -10,6 +10,10 @@ export const AskListerDto = z.object({
   canonicalAttributes: z.array(z.string().min(1)).optional(),
 });
 
+export const BookSlotDto = z.object({
+  slotId: z.string().min(1, 'Slot ID is required'),
+});
+
 export const GetMessagesQueryDto = z.object({
   limit: z.coerce
     .number()
@@ -23,4 +27,5 @@ export const GetMessagesQueryDto = z.object({
 
 export type PostMessageDtoType = z.infer<typeof PostMessageDto>;
 export type AskListerDtoType = z.infer<typeof AskListerDto>;
+export type BookSlotDtoType = z.infer<typeof BookSlotDto>;
 export type GetMessagesQueryDtoType = z.infer<typeof GetMessagesQueryDto>;
