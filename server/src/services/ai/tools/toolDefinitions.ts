@@ -85,12 +85,17 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'send_question_to_lister',
-      description: 'Escalate an unanswered question to the property lister',
+      description:
+        'Escalate an unanswered question to the property lister. question_text must be a clear standalone question a lister can answer without chat history (never bare follow-ups like "why" or "ok").',
       parameters: {
         type: 'object',
         properties: {
           property_id: { type: 'string' },
-          question_text: { type: 'string' },
+          question_text: {
+            type: 'string',
+            description:
+              'Full contextual question for the lister, e.g. "Why are pets not allowed under the body corporate rules for this property?"',
+          },
           resolved_intent: { type: 'string' },
           canonical_attributes: {
             type: 'array',

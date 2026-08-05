@@ -15,7 +15,11 @@ import {
   upsertMemoryFact,
 } from './sessionMemory.js';
 import { buildMemoryToolAttributes } from '../helpers/memoryAttributes.js';
+import { enrichListerQuestion } from '../helpers/enrichListerQuestion.js';
 import type { AgentContext } from '../types/ai.types.js';
+import { createLogger } from '../../../utils/helpers/logger.js';
+
+const logger = createLogger('ToolHandlers');
 
 export class ToolHandlers {
   async executeTool(
@@ -119,10 +123,35 @@ export class ToolHandlers {
 
   private async sendQuestionToLister(context: AgentContext, args: Record<string, unknown>): Promise<string> {
     const propertyId = getStringArg(args, 'property_id') ?? context.propertyId;
-    const questionText = getStringArg(args, 'question_text');
+    const rawQuestionText = getStringArg(args, 'question_text');
 
-    if (!questionText) {
+    if (!rawQuestionText) {
       return JSON.stringify({ error: 'question_text is required' });
+    }
+
+    let history = context.recentMessages ?? [];
+    if (history.length === 0) {
+      const recent = await prisma.chatMessage.findMany({
+        where: { sessionId: context.sessionId, ...notDeleted() },
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+        select: { role: true, content: true },
+      });
+      history = recent.reverse().map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
+    }
+
+    const questionText = enrichListerQuestion(rawQuestionText, [
+      ...history,
+      { role: 'USER', content: context.userMessage },
+    ]);
+
+    if (questionText !== rawQuestionText.trim()) {
+      logger.info(
+        `Enriched bare lister question sessionId=${context.sessionId} from=${rawQuestionText.slice(0, 80)} to=${questionText.slice(0, 160)}`,
+      );
     }
 
     const result = await listerService.createQuestion({
