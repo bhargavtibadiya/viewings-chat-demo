@@ -7,6 +7,8 @@ import type {
   IGetMessagesThunkResponse,
   ISendMessageThunkPayload,
   ISendMessageThunkResponse,
+  IAskListerThunkPayload,
+  IAskListerThunkResponse,
 } from '@/store/chat/chat.types';
 
 export const chatService = {
@@ -39,5 +41,16 @@ export const chatService = {
   sendMessage: (data: ISendMessageThunkPayload) => {
     const url = replaceRouteParam(ROUTES.CHAT.MESSAGES, ':sessionId', data.sessionId);
     return axiosInstance.post<ISendMessageThunkResponse>(url, { content: data.content });
+  },
+
+  /**
+   * @param data Session id and question to escalate to the lister
+   */
+  askLister: (data: IAskListerThunkPayload) => {
+    const url = replaceRouteParam(ROUTES.CHAT.ASK_LISTER, ':sessionId', data.sessionId);
+    return axiosInstance.post<IAskListerThunkResponse>(url, {
+      questionText: data.questionText,
+      canonicalAttributes: data.canonicalAttributes,
+    });
   },
 };

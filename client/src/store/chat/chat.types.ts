@@ -41,6 +41,7 @@ export interface IGetMessagesThunkPayload {
   sessionId: string;
   before?: string;
   limit?: number;
+  skipCache?: boolean;
 }
 
 export interface IGetMessagesThunkResponseData {
@@ -55,7 +56,14 @@ export interface ISendMessageThunkPayload {
   content: string;
 }
 
+export interface IAskListerThunkPayload {
+  sessionId: string;
+  questionText: string;
+  canonicalAttributes?: string[];
+}
+
 export type ISendMessageThunkResponse = ApiSuccessResponse<IChatTurnResponse>;
+export type IAskListerThunkResponse = ApiSuccessResponse<IChatTurnResponse>;
 
 export interface ChatSliceInterface {
   getSessionLoading: boolean;
@@ -71,6 +79,8 @@ export interface ChatSliceInterface {
   sessionMessagesCache: Record<string, ISessionMessagesCache>;
   sendMessageLoading: boolean;
   sendMessageError: string | null;
+  askListerLoading: boolean;
+  askListerError: string | null;
   lastTurn: IChatTurnResponse | null;
   showDebugStrip: boolean;
 }
