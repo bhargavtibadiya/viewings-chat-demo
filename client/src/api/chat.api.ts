@@ -9,6 +9,8 @@ import type {
   ISendMessageThunkResponse,
   IAskListerThunkPayload,
   IAskListerThunkResponse,
+  IBookSlotThunkPayload,
+  IBookSlotThunkResponse,
 } from '@/store/chat/chat.types';
 
 export const chatService = {
@@ -52,5 +54,13 @@ export const chatService = {
       questionText: data.questionText,
       canonicalAttributes: data.canonicalAttributes,
     });
+  },
+
+  /**
+   * @param data Session id and availability slot to book from chat
+   */
+  bookSlot: (data: IBookSlotThunkPayload) => {
+    const url = replaceRouteParam(ROUTES.CHAT.BOOK_SLOT, ':sessionId', data.sessionId);
+    return axiosInstance.post<IBookSlotThunkResponse>(url, { slotId: data.slotId });
   },
 };

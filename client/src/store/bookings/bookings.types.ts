@@ -19,8 +19,8 @@ export type IGetBookingByIdThunkResponse = ApiSuccessResponse<IGetBookingByIdThu
 export interface ICreateBookingThunkPayload {
   propertyId: string;
   slotId: string;
-  contactName: string;
-  contactEmail: string;
+  contactName?: string;
+  contactEmail?: string;
   contactPhone?: string;
   notes?: string;
 }

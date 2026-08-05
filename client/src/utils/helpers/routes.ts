@@ -12,6 +12,7 @@ export const ROUTES = {
     SESSION_BY_PROPERTY: '/api/chat/sessions/:propertyId',
     MESSAGES: '/api/chat/sessions/:sessionId/messages',
     ASK_LISTER: '/api/chat/sessions/:sessionId/ask-lister',
+    BOOK_SLOT: '/api/chat/sessions/:sessionId/book',
   },
   BOOKINGS: {
     LIST: '/api/bookings',
