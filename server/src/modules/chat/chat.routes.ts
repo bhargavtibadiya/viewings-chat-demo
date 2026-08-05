@@ -51,4 +51,16 @@ router.post(
   chatController.postMessage,
 );
 
+/**
+ * @route   POST /api/chat/sessions/:sessionId/ask-lister
+ * @desc    Escalate a question to the property lister
+ * @access  Protected
+ */
+router.post(
+  ROUTES.CHAT.ASK_LISTER,
+  authenticate,
+  chatLimiter,
+  chatController.askLister,
+);
+
 export default router;

@@ -5,6 +5,11 @@ export const PostMessageDto = z.object({
   content: z.string().min(1, 'Message content is required').max(4000),
 });
 
+export const AskListerDto = z.object({
+  questionText: z.string().min(1, 'Question text is required').max(4000),
+  canonicalAttributes: z.array(z.string().min(1)).optional(),
+});
+
 export const GetMessagesQueryDto = z.object({
   limit: z.coerce
     .number()
@@ -17,4 +22,5 @@ export const GetMessagesQueryDto = z.object({
 });
 
 export type PostMessageDtoType = z.infer<typeof PostMessageDto>;
+export type AskListerDtoType = z.infer<typeof AskListerDto>;
 export type GetMessagesQueryDtoType = z.infer<typeof GetMessagesQueryDto>;

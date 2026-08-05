@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ChatService } from './chat.service.js';
-import { PostMessageDto, GetMessagesQueryDto } from './dto/chat.dto.js';
-import type { PostMessageDtoType } from './dto/chat.dto.js';
+import { PostMessageDto, GetMessagesQueryDto, AskListerDto } from './dto/chat.dto.js';
+import type { PostMessageDtoType, AskListerDtoType } from './dto/chat.dto.js';
 import type {
   ChatMessagesResponse,
   ChatTurnResponse,
@@ -114,6 +114,38 @@ export class ChatController {
       const result = await this.chatService.postMessage(req.user.id, sessionId, dto);
 
       sendCreated<ChatTurnResponse>(res, 'Assistant response ready', result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  askLister = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        sendBadRequest(res, 'Authentication required');
+        return;
+      }
+
+      const { sessionId } = req.params;
+      if (!sessionId) {
+        sendBadRequest(res, 'Session ID is required');
+        return;
+      }
+
+      const dtoResult = AskListerDto.safeParse(req.body);
+      if (!dtoResult.success) {
+        const errors = dtoResult.error.issues.map((issue) => ({
+          field: issue.path.join('.'),
+          message: issue.message,
+        }));
+        sendBadRequest(res, 'Validation failed', errors);
+        return;
+      }
+
+      const dto: AskListerDtoType = dtoResult.data;
+      const result = await this.chatService.askLister(req.user.id, sessionId, dto);
+
+      sendCreated<ChatTurnResponse>(res, 'Question sent to lister', result);
     } catch (error) {
       next(error);
     }
