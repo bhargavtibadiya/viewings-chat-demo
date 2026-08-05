@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ChatService } from './chat.service.js';
-import { PostMessageDto } from './dto/chat.dto.js';
+import { PostMessageDto, GetMessagesQueryDto } from './dto/chat.dto.js';
 import type { PostMessageDtoType } from './dto/chat.dto.js';
 import type {
   ChatMessagesResponse,
@@ -50,7 +50,17 @@ export class ChatController {
         return;
       }
 
-      const result = await this.chatService.getMessages(req.user.id, sessionId);
+      const queryResult = GetMessagesQueryDto.safeParse(req.query);
+      if (!queryResult.success) {
+        const errors = queryResult.error.issues.map((issue) => ({
+          field: issue.path.join('.'),
+          message: issue.message,
+        }));
+        sendBadRequest(res, 'Validation failed', errors);
+        return;
+      }
+
+      const result = await this.chatService.getMessages(req.user.id, sessionId, queryResult.data);
       sendSuccess<ChatMessagesResponse>(res, 'Messages retrieved', result);
     } catch (error) {
       next(error);

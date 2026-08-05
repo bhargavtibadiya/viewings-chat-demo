@@ -10,7 +10,7 @@ import { createServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';
 import { AI } from '../../utils/constants/pagination.js';
 import { isRecord } from '../../utils/helpers/json.js';
-import type { PostMessageDtoType } from './dto/chat.dto.js';
+import type { PostMessageDtoType, GetMessagesQueryDtoType } from './dto/chat.dto.js';
 import type {
   ChatMessagesResponse,
   ChatTurnResponse,
@@ -96,15 +96,65 @@ export class ChatService {
     return this.toSafeSession(session);
   }
 
-  async getMessages(userId: string, sessionId: string): Promise<ChatMessagesResponse> {
+  async getMessages(
+    userId: string,
+    sessionId: string,
+    query: GetMessagesQueryDtoType,
+  ): Promise<ChatMessagesResponse> {
     await this.verifySessionOwnership(userId, sessionId);
 
+    const limit = query.limit;
+    const whereBase = { sessionId, ...notDeleted() };
+
+    const total = await prisma.chatMessage.count({ where: whereBase });
+
+    let cursorCreatedAt: Date | undefined;
+    if (query.before) {
+      const cursorMessage = await prisma.chatMessage.findFirst({
+        where: { id: query.before, sessionId, ...notDeleted() },
+      });
+
+      if (!cursorMessage) {
+        throw createServiceError(404, 'Message not found');
+      }
+
+      cursorCreatedAt = cursorMessage.createdAt;
+    }
+
     const messages = await prisma.chatMessage.findMany({
-      where: { sessionId, ...notDeleted() },
-      orderBy: { createdAt: 'asc' },
+      where: cursorCreatedAt
+        ? { ...whereBase, createdAt: { lt: cursorCreatedAt } }
+        : whereBase,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
     });
 
-    return { messages: messages.map((message) => this.toSafeMessage(message)) };
+    messages.reverse();
+
+    const oldestInBatch = messages[0];
+    const newestInBatch = messages[messages.length - 1];
+
+    let hasMoreOlder = false;
+    if (oldestInBatch) {
+      const olderCount = await prisma.chatMessage.count({
+        where: {
+          ...whereBase,
+          createdAt: { lt: oldestInBatch.createdAt },
+        },
+      });
+      hasMoreOlder = olderCount > 0;
+    }
+
+    return {
+      messages: messages.map((message) => this.toSafeMessage(message)),
+      pagination: {
+        limit,
+        total,
+        hasMoreOlder,
+        oldestMessageId: oldestInBatch?.id ?? null,
+        newestMessageId: newestInBatch?.id ?? null,
+      },
+    };
   }
 
   async getSessionMemory(userId: string, sessionId: string): Promise<SessionMemoryResponse> {
