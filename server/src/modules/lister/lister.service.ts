@@ -2,11 +2,13 @@ import type { Prisma, UnansweredQuestion, Property } from '#generated/client.js'
 import prisma from '../../config/prisma.js';
 import { createServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';
+import { attributeValueToJson } from '../../utils/helpers/listingAttribute.js';
 import {
   parseSessionMemory,
   sessionMemoryToJson,
   upsertMemoryFact,
 } from '../../services/ai/tools/sessionMemory.js';
+import { parseListerAnswer } from '../../services/ai/helpers/parseListerAnswer.js';
 import type { AnswerQuestionDtoType, CreateQuestionInput } from './dto/lister.dto.js';
 import type {
   AnswerQuestionResult,
@@ -159,24 +161,69 @@ export class ListerService {
         },
       });
 
+      const parsedFacts = parseListerAnswer(dto.answerText, canonicalAttributes);
+
+      for (const fact of parsedFacts) {
+        await tx.listingAttribute.upsert({
+          where: {
+            propertyId_key: {
+              propertyId: question.propertyId,
+              key: fact.attribute,
+            },
+          },
+          create: {
+            propertyId: question.propertyId,
+            key: fact.attribute,
+            value: attributeValueToJson(fact.value),
+            source: 'LISTER_APPROVED',
+          },
+          update: {
+            value: attributeValueToJson(fact.value),
+            source: 'LISTER_APPROVED',
+            deletedAt: null,
+          },
+        });
+      }
+
       if (question.sessionId) {
         const session = await tx.chatSession.findFirst({
           where: { id: question.sessionId, ...notDeleted() },
         });
 
         if (session) {
-          const memory = parseSessionMemory(session.contextMemory);
-          const primaryAttribute = canonicalAttributes[0] ?? 'lister_answer';
-          const updatedMemory = upsertMemoryFact(memory, {
-            attribute: primaryAttribute,
-            value: dto.answerText,
-            source: 'lister_answer',
-            questionId,
-          });
+          let memory = parseSessionMemory(session.contextMemory);
+
+          for (const fact of parsedFacts) {
+            memory = upsertMemoryFact(memory, {
+              attribute: fact.attribute,
+              value: fact.value,
+              source: 'lister_answer',
+              questionId,
+            });
+          }
 
           await tx.chatSession.update({
             where: { id: session.id },
-            data: { contextMemory: sessionMemoryToJson(updatedMemory) },
+            data: { contextMemory: sessionMemoryToJson(memory) },
+          });
+
+          const summary =
+            parsedFacts.length === 1
+              ? `The lister has answered your question: ${parsedFacts[0].value}`
+              : `The lister has provided an update:\n${parsedFacts.map((fact) => `- **${fact.attribute.replace(/_/g, ' ')}**: ${fact.value}`).join('\n')}`;
+
+          await tx.chatMessage.create({
+            data: {
+              sessionId: session.id,
+              role: 'ASSISTANT',
+              content: summary,
+              answerStatus: 'LIMITED',
+              metadata: {
+                source: 'lister_answer',
+                questionId,
+                approvedAnswerId: approvedAnswer.id,
+              },
+            },
           });
         }
       }

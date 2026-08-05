@@ -10,7 +10,7 @@ import { createServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';
 import { AI } from '../../utils/constants/pagination.js';
 import { isRecord } from '../../utils/helpers/json.js';
-import type { PostMessageDtoType, GetMessagesQueryDtoType } from './dto/chat.dto.js';
+import type { PostMessageDtoType, GetMessagesQueryDtoType, AskListerDtoType } from './dto/chat.dto.js';
 import type {
   ChatMessagesResponse,
   ChatTurnResponse,
@@ -26,6 +26,7 @@ import {
   stringArrayToJson,
   toolCallsToJson,
 } from './helpers/chatJson.js';
+import { listerService } from '../lister/lister.service.js';
 import type { ChatAction } from '../../services/ai/types/ai.types.js';
 
 function parseActions(value: Prisma.JsonValue | null): ChatAction[] | null {
@@ -41,7 +42,24 @@ function parseActions(value: Prisma.JsonValue | null): ChatAction[] | null {
     const type = item.type;
     const label = item.label;
     if (typeof type === 'string' && typeof label === 'string') {
-      actions.push({ type, label });
+      const action: ChatAction = { type, label };
+      const payloadRaw = item.payload;
+      if (isRecord(payloadRaw)) {
+        const payload: Record<string, string | number | boolean> = {};
+        for (const [key, payloadValue] of Object.entries(payloadRaw)) {
+          if (
+            typeof payloadValue === 'string' ||
+            typeof payloadValue === 'number' ||
+            typeof payloadValue === 'boolean'
+          ) {
+            payload[key] = payloadValue;
+          }
+        }
+        if (Object.keys(payload).length > 0) {
+          action.payload = payload;
+        }
+      }
+      actions.push(action);
     }
   }
 
@@ -240,6 +258,89 @@ export class ChatService {
       facts: agentResult.facts,
       actions: agentResult.actions,
       debug: agentResult.debug,
+    };
+  }
+
+  async askLister(userId: string, sessionId: string, dto: AskListerDtoType): Promise<ChatTurnResponse> {
+    const session = await this.verifySessionOwnership(userId, sessionId);
+
+    const property = await prisma.property.findFirst({
+      where: { id: session.propertyId, ...notDeleted() },
+    });
+
+    if (!property) {
+      throw createServiceError(404, 'Property not found');
+    }
+
+    const userMessage = await prisma.chatMessage.create({
+      data: {
+        sessionId,
+        role: 'USER',
+        content: dto.questionText,
+      },
+    });
+
+    const escalation = await listerService.createQuestion({
+      propertyId: session.propertyId,
+      sessionId,
+      userId,
+      questionText: dto.questionText,
+      canonicalAttributes: dto.canonicalAttributes,
+    });
+
+    const assistantContent = escalation.delivered
+      ? 'I have sent your question to the lister. They will review it and publish an approved answer when ready.'
+      : 'I could not deliver your question to the lister. Please try again shortly.';
+
+    const assistantMessage = await prisma.chatMessage.create({
+      data: {
+        sessionId,
+        role: 'ASSISTANT',
+        content: assistantContent,
+        answerStatus: 'LIMITED',
+        metadata: {
+          escalation: {
+            questionId: escalation.questionId,
+            delivered: escalation.delivered,
+          },
+        },
+      },
+    });
+
+    await prisma.turnLog.create({
+      data: {
+        sessionId,
+        userMessageId: userMessage.id,
+        assistantMessageId: assistantMessage.id,
+        intents: stringArrayToJson(['ask_lister']),
+        attributes: stringArrayToJson(dto.canonicalAttributes ?? []),
+        entities: stringArrayToJson([]),
+        toolsCalled: toolCallsToJson([
+          {
+            name: 'send_question_to_lister',
+            arguments: {},
+            result: JSON.stringify(escalation),
+          },
+        ]),
+        sources: chatFactsToJson([]),
+        answerStatus: 'LIMITED',
+        cta: optionalJsonObject(null),
+        rawModelTrace: rawTraceToJson([]),
+        latencyMs: 0,
+      },
+    });
+
+    return {
+      message: this.toSafeMessage(assistantMessage),
+      answer_status: 'LIMITED',
+      facts: [],
+      actions: [],
+      debug: {
+        intents: ['ask_lister'],
+        attributes: dto.canonicalAttributes ?? [],
+        tools: ['send_question_to_lister'],
+        cta: null,
+      },
     };
   }
 

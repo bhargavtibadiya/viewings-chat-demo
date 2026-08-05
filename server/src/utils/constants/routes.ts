@@ -19,6 +19,7 @@ export const ROUTES = {
     GET_OR_CREATE_SESSION: '/sessions/:propertyId',
     GET_MESSAGES: '/sessions/:sessionId/messages',
     POST_MESSAGE: '/sessions/:sessionId/messages',
+    ASK_LISTER: '/sessions/:sessionId/ask-lister',
     GET_SESSION_MEMORY: '/sessions/:sessionId/memory',
   },
   BOOKINGS: {
