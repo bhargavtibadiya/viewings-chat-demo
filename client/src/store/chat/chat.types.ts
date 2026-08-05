@@ -5,6 +5,28 @@ import type {
   IChatTurnResponse,
 } from '@/store/types';
 
+export const PENDING_USER_MESSAGE_ID_PREFIX = 'pending-user-';
+export const CHAT_MESSAGES_FETCH_INITIAL_KEY = 'initial';
+export const CHAT_MESSAGES_DEFAULT_LIMIT = 20;
+
+export interface IChatMessagesPagination {
+  limit: number;
+  total: number;
+  hasMoreOlder: boolean;
+  oldestMessageId: string | null;
+  newestMessageId: string | null;
+}
+
+export interface ISessionMessagesCache {
+  messages: IChatMessage[];
+  pagination: IChatMessagesPagination | null;
+  fetchedKeys: string[];
+}
+
+export function getMessagesFetchKey(before?: string): string {
+  return before ? `before:${before}` : CHAT_MESSAGES_FETCH_INITIAL_KEY;
+}
+
 export interface IGetSessionThunkPayload {
   propertyId: string;
 }
@@ -17,10 +39,13 @@ export type IGetSessionThunkResponse = ApiSuccessResponse<IGetSessionThunkRespon
 
 export interface IGetMessagesThunkPayload {
   sessionId: string;
+  before?: string;
+  limit?: number;
 }
 
 export interface IGetMessagesThunkResponseData {
   messages: IChatMessage[];
+  pagination: IChatMessagesPagination;
 }
 
 export type IGetMessagesThunkResponse = ApiSuccessResponse<IGetMessagesThunkResponseData>;
@@ -34,11 +59,18 @@ export type ISendMessageThunkResponse = ApiSuccessResponse<IChatTurnResponse>;
 
 export interface ChatSliceInterface {
   getSessionLoading: boolean;
+  hasRequestedSession: boolean;
   session: IChatSession | null;
+  getSessionError: string | null;
   getMessagesLoading: boolean;
+  getOlderMessagesLoading: boolean;
   hasRequestedMessages: boolean;
   messages: IChatMessage[];
+  messagesPagination: IChatMessagesPagination | null;
+  getMessagesError: string | null;
+  sessionMessagesCache: Record<string, ISessionMessagesCache>;
   sendMessageLoading: boolean;
+  sendMessageError: string | null;
   lastTurn: IChatTurnResponse | null;
   showDebugStrip: boolean;
 }

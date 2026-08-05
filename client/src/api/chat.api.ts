@@ -23,7 +23,14 @@ export const chatService = {
    */
   getMessages: (data: IGetMessagesThunkPayload) => {
     const url = replaceRouteParam(ROUTES.CHAT.MESSAGES, ':sessionId', data.sessionId);
-    return axiosInstance.get<IGetMessagesThunkResponse>(url);
+    const params: Record<string, string | number> = {};
+    if (data.before) {
+      params.before = data.before;
+    }
+    if (data.limit !== undefined) {
+      params.limit = data.limit;
+    }
+    return axiosInstance.get<IGetMessagesThunkResponse>(url, { params });
   },
 
   /**

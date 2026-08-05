@@ -1,18 +1,27 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, FlaskConical, PanelRightOpen, Send } from 'lucide-react';
-import { Badge, Button, Loader } from '@/components/ui';
+import { Badge, Button } from '@/components/ui';
+import { ChatLoadingSkeleton } from '@/components/chat/ChatLoadingSkeleton';
 import { ChatThread } from '@/components/chat/ChatThread';
 import { EvidencePicker, EvidenceSheet } from '@/components/chat/EvidenceSidebar';
 import { useAppDispatch, useAppSelector } from '@/store/store';
 import { getMessagesThunk, getSessionThunk, sendMessageThunk } from '@/store/chat/chat.thunk';
-import { clearChatState, toggleDebugStrip } from '@/store/chat/chat.slice';
+import {
+  clearChatState,
+  hydrateMessagesFromCache,
+  toggleDebugStrip,
+} from '@/store/chat/chat.slice';
 import { getPropertiesThunk } from '@/store/properties/properties.thunk';
 import { getPropertyByIdThunk } from '@/store/properties/properties.thunk';
 import { findPropertyByFixtureKey, formatListingPrice, formatListingType } from '@/utils/helpers/propertyFormatters';
 import type { EvidencePrompt } from '@/utils/helpers/evidencePrompts';
 import type { IChatAction } from '@/store/types';
 import { setActiveSessionId } from '@/store/demo/demo.slice';
+import {
+  CHAT_MESSAGES_DEFAULT_LIMIT,
+  CHAT_MESSAGES_FETCH_INITIAL_KEY,
+} from '@/store/chat/chat.types';
 
 export function ChatPage(): React.ReactElement {
   const { propertyId = '' } = useParams();
@@ -22,10 +31,16 @@ export function ChatPage(): React.ReactElement {
   const pendingHandledRef = useRef(false);
   const session = useAppSelector((state) => state.chat.session);
   const messages = useAppSelector((state) => state.chat.messages);
+  const messagesPagination = useAppSelector((state) => state.chat.messagesPagination);
+  const sessionMessagesCache = useAppSelector((state) => state.chat.sessionMessagesCache);
   const lastTurn = useAppSelector((state) => state.chat.lastTurn);
   const sendLoading = useAppSelector((state) => state.chat.sendMessageLoading);
+  const sendMessageError = useAppSelector((state) => state.chat.sendMessageError);
   const sessionLoading = useAppSelector((state) => state.chat.getSessionLoading);
   const messagesLoading = useAppSelector((state) => state.chat.getMessagesLoading);
+  const loadingOlder = useAppSelector((state) => state.chat.getOlderMessagesLoading);
+  const getSessionError = useAppSelector((state) => state.chat.getSessionError);
+  const getMessagesError = useAppSelector((state) => state.chat.getMessagesError);
   const hasRequestedMessages = useAppSelector((state) => state.chat.hasRequestedMessages);
   const showDebugStrip = useAppSelector((state) => state.chat.showDebugStrip);
   const property = useAppSelector((state) => state.properties.property);
@@ -48,10 +63,32 @@ export function ChatPage(): React.ReactElement {
 
   useEffect(() => {
     if (!session) return;
+
+    const cached = sessionMessagesCache[session.id];
+    const hasInitialCache = cached?.fetchedKeys.includes(CHAT_MESSAGES_FETCH_INITIAL_KEY);
+
+    if (hasInitialCache) {
+      dispatch(hydrateMessagesFromCache({ sessionId: session.id }));
+      dispatch(setActiveSessionId(session.id));
+      return;
+    }
+
     if (hasRequestedMessages || messagesLoading) return;
-    dispatch(getMessagesThunk({ sessionId: session.id }));
+
+    dispatch(
+      getMessagesThunk({
+        sessionId: session.id,
+        limit: CHAT_MESSAGES_DEFAULT_LIMIT,
+      }),
+    );
     dispatch(setActiveSessionId(session.id));
-  }, [dispatch, hasRequestedMessages, messagesLoading, session]);
+  }, [
+    dispatch,
+    hasRequestedMessages,
+    messagesLoading,
+    session,
+    sessionMessagesCache,
+  ]);
 
   const handleSend = useCallback(
     async (content: string): Promise<void> => {
@@ -62,9 +99,30 @@ export function ChatPage(): React.ReactElement {
     [dispatch, session],
   );
 
+  const handleLoadOlder = useCallback(() => {
+    if (!session || !messagesPagination?.oldestMessageId || loadingOlder) return;
+
+    dispatch(
+      getMessagesThunk({
+        sessionId: session.id,
+        before: messagesPagination.oldestMessageId,
+        limit: CHAT_MESSAGES_DEFAULT_LIMIT,
+      }),
+    );
+  }, [dispatch, loadingOlder, messagesPagination?.oldestMessageId, session]);
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     void handleSend(draft);
+  };
+
+  const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      if (draft.trim().length > 0 && !sendLoading && !isChatLoading) {
+        void handleSend(draft);
+      }
+    }
   };
 
   const handlePromptSelect = (prompt: EvidencePrompt): void => {
@@ -94,6 +152,8 @@ export function ChatPage(): React.ReactElement {
   }, [handleSend, location.pathname, location.state, navigate, sendLoading, session]);
 
   const actionButtons = lastTurn?.actions ?? [];
+  const isChatLoading = sessionLoading || messagesLoading;
+  const hasMoreOlder = messagesPagination?.hasMoreOlder ?? false;
 
   return (
     <div className="flex flex-col gap-3">
@@ -148,15 +208,25 @@ export function ChatPage(): React.ReactElement {
         <div
           className="flex min-h-[min(520px,calc(100vh-11rem))] max-h-[min(640px,calc(100vh-9rem))] flex-col overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border-light)] bg-[var(--color-bg-surface)] shadow-[var(--shadow-card)]"
         >
-          {(sessionLoading || messagesLoading) && (
-            <div className="border-b border-[var(--color-border-light)] px-3 py-2">
-              <Loader label="Loading chat" size="sm" />
+          {isChatLoading ? (
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+              <ChatLoadingSkeleton />
             </div>
+          ) : (
+            <ChatThread
+              messages={messages}
+              isThinking={sendLoading}
+              hasMoreOlder={hasMoreOlder}
+              loadingOlder={loadingOlder}
+              onLoadOlder={handleLoadOlder}
+            />
           )}
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            <ChatThread messages={messages} sendLoading={sendLoading} />
-          </div>
+          {(getSessionError || getMessagesError || sendMessageError) && (
+            <div className="border-t border-[var(--color-border-light)] px-3 py-2 text-[var(--text-sm)] text-[var(--color-error)]">
+              {sendMessageError ?? getMessagesError ?? getSessionError}
+            </div>
+          )}
 
           {actionButtons.length > 0 && (
             <div className="flex flex-wrap gap-1.5 border-t border-[var(--color-border-light)] px-3 py-2">
@@ -167,14 +237,16 @@ export function ChatPage(): React.ReactElement {
           )}
 
           <form
-            className="flex items-end gap-2 border-t border-[var(--color-border-light)] bg-[var(--color-bg-base)] px-3 py-2.5"
+            className="flex items-center gap-2 border-t border-[var(--color-border-light)] bg-[var(--color-bg-base)] px-3 py-2.5"
             onSubmit={handleSubmit}
           >
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleDraftKeyDown}
               placeholder="Ask about this listing…"
               rows={1}
+              disabled={isChatLoading || sendLoading}
               className="min-h-[36px] max-h-24 flex-1 resize-none rounded-[var(--radius-sm)] border-[1.5px] border-[var(--color-border-medium)] bg-[var(--color-bg-surface)] px-3 py-2 text-[var(--text-sm)] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:shadow-[var(--shadow-input-focus)]"
             />
             <Button
@@ -182,9 +254,9 @@ export function ChatPage(): React.ReactElement {
               variant="primary"
               size="sm"
               iconOnly
-              loading={sendLoading}
-              disabled={draft.trim().length === 0}
+              disabled={draft.trim().length === 0 || sendLoading || isChatLoading}
               aria-label="Send message"
+              className="shrink-0"
             >
               <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Button>
