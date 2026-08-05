@@ -148,12 +148,12 @@ function MessageBubble({
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'rounded-[var(--radius-sm)] px-3 py-2 text-[var(--text-sm)] leading-relaxed',
+          'rounded-[var(--radius-sm)] text-[var(--text-sm)] leading-relaxed',
           isUser
-            ? 'max-w-[88%] bg-[var(--color-primary)] text-[var(--color-text-inverse)] [&_p]:text-[var(--color-text-inverse)]'
+            ? 'max-w-[88%] bg-[var(--color-primary)] px-3 py-2 text-[var(--color-text-inverse)] [&_p]:text-[var(--color-text-inverse)]'
             : hasSlots
-              ? 'w-full max-w-[min(100%,28rem)] border border-[var(--color-border-light)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)]'
-              : 'max-w-[88%] border border-[var(--color-border-light)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)]',
+              ? 'w-full max-w-[42rem] border border-[var(--color-border-light)] bg-[var(--color-bg-base)] px-3 py-3 text-[var(--color-text-primary)] sm:px-4 sm:py-4'
+              : 'max-w-[88%] border border-[var(--color-border-light)] bg-[var(--color-bg-base)] px-3 py-2 text-[var(--color-text-primary)]',
         )}
       >
         {isUser ? (
