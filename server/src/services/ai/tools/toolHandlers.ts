@@ -16,8 +16,10 @@ import {
 } from './sessionMemory.js';
 import { buildMemoryToolAttributes } from '../helpers/memoryAttributes.js';
 import { enrichListerQuestion } from '../helpers/enrichListerQuestion.js';
+import { resolveAvailabilitySlot } from '../helpers/resolveAvailabilitySlot.js';
 import type { AgentContext } from '../types/ai.types.js';
 import { createLogger } from '../../../utils/helpers/logger.js';
+import { ServiceError } from '../../../utils/helpers/serviceError.js';
 
 const logger = createLogger('ToolHandlers');
 
@@ -27,34 +29,69 @@ export class ToolHandlers {
     rawArguments: string,
     context: AgentContext,
   ): Promise<string> {
-    const args = parseToolArguments(rawArguments);
+    try {
+      const args = parseToolArguments(rawArguments);
 
-    switch (toolName) {
-      case 'get_property':
-        return this.getProperty(getStringArg(args, 'property_id') ?? context.propertyId);
-      case 'search_listings':
-        return this.searchListings(args);
-      case 'get_availability':
-        return this.getAvailability(getStringArg(args, 'property_id') ?? context.propertyId, args);
-      case 'create_booking':
-        return this.createBooking(context.userId, args);
-      case 'cancel_booking':
-        return this.cancelBooking(context.userId, args);
-      case 'send_question_to_lister':
-        return this.sendQuestionToLister(context, args);
-      case 'capture_contact':
-        return this.captureContact(context.userId, args);
-      case 'request_callback':
-        return this.requestCallback(context.userId, args);
-      case 'read_session_memory':
-        return this.readSessionMemory(getStringArg(args, 'session_id') ?? context.sessionId, args);
-      case 'write_session_memory':
-        return this.writeSessionMemory(getStringArg(args, 'session_id') ?? context.sessionId, args);
-      case 'get_approved_answers':
-        return this.getApprovedAnswers(getStringArg(args, 'property_id') ?? context.propertyId, args);
-      default:
-        return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+      switch (toolName) {
+        case 'get_property':
+          return await this.getProperty(this.resolvePropertyId(args, context));
+        case 'search_listings':
+          return await this.searchListings(args);
+        case 'get_availability':
+          return await this.getAvailability(this.resolvePropertyId(args, context), args);
+        case 'create_booking':
+          return await this.createBooking(context.userId, args, context);
+        case 'cancel_booking':
+          return await this.cancelBooking(context.userId, args);
+        case 'send_question_to_lister':
+          return await this.sendQuestionToLister(context, args);
+        case 'get_open_lister_questions':
+          return await this.getOpenListerQuestions(context, args);
+        case 'capture_contact':
+          return await this.captureContact(context.userId, args);
+        case 'request_callback':
+          return await this.requestCallback(context.userId, args, context);
+        case 'read_session_memory':
+          return await this.readSessionMemory(
+            getStringArg(args, 'session_id') ?? context.sessionId,
+            args,
+            context,
+          );
+        case 'write_session_memory':
+          return await this.writeSessionMemory(
+            getStringArg(args, 'session_id') ?? context.sessionId,
+            args,
+          );
+        case 'get_approved_answers':
+          return await this.getApprovedAnswers(this.resolvePropertyId(args, context), args);
+        default:
+          return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+      }
+    } catch (error) {
+      if (error instanceof ServiceError) {
+        logger.warn(`Tool ${toolName} failed: ${error.message}`);
+        return JSON.stringify({
+          error: error.message,
+          statusCode: error.statusCode,
+          tool: toolName,
+        });
+      }
+      logger.error(`Tool ${toolName} unexpected error`, error);
+      return JSON.stringify({
+        error: 'Tool execution failed',
+        tool: toolName,
+      });
     }
+  }
+
+  private resolvePropertyId(args: Record<string, unknown>, context: AgentContext): string {
+    const requested = getStringArg(args, 'property_id');
+    if (requested && requested !== context.propertyId) {
+      logger.warn(
+        `Ignoring tool property_id=${requested}; using session propertyId=${context.propertyId}`,
+      );
+    }
+    return context.propertyId;
   }
 
   private async getProperty(propertyId: string): Promise<string> {
@@ -89,26 +126,78 @@ export class ToolHandlers {
     return JSON.stringify(result);
   }
 
-  private async createBooking(userId: string, args: Record<string, unknown>): Promise<string> {
-    const propertyId = getStringArg(args, 'property_id');
-    const slotId = getStringArg(args, 'slot_id');
+  private async createBooking(
+    userId: string,
+    args: Record<string, unknown>,
+    context: AgentContext,
+  ): Promise<string> {
+    const propertyId = this.resolvePropertyId(args, context);
     const contactName = getStringArg(args, 'contact_name');
     const contactEmail = getStringArg(args, 'contact_email');
+    const slotIdArg = getStringArg(args, 'slot_id');
+    const preferredStartsAt = getStringArg(args, 'preferred_starts_at');
+    const slotLabel = getStringArg(args, 'slot_label');
 
-    if (!propertyId || !slotId || !contactName || !contactEmail) {
-      return JSON.stringify({ error: 'Missing required booking fields' });
+    if (!contactName || !contactEmail) {
+      return JSON.stringify({
+        error: 'Missing required booking fields',
+        required: ['property_id', 'contact_name', 'contact_email', 'slot_id or slot_label'],
+      });
     }
 
-    const result = await bookingsService.createBookingFromTool(userId, {
-      propertyId,
-      slotId,
-      contactName,
-      contactEmail,
-      contactPhone: getStringArg(args, 'contact_phone'),
-      notes: getStringArg(args, 'notes'),
-    });
+    try {
+      const availability = await propertiesService.getAvailability(propertyId, {});
+      const resolved = resolveAvailabilitySlot(availability.slots, {
+        slotId: slotIdArg,
+        preferredStartsAt,
+        slotLabel,
+      });
 
-    return JSON.stringify(result);
+      if (!resolved) {
+        return JSON.stringify({
+          error: 'Could not match that viewing time to an available slot',
+          hint: 'Call get_availability and pass the exact slot_id from the response',
+          availableSlots: availability.slots.map((slot) => ({
+            id: slot.id,
+            label: slot.label,
+            startsAt: slot.startsAt,
+          })),
+        });
+      }
+
+      const result = await bookingsService.createBookingFromTool(userId, {
+        propertyId,
+        slotId: resolved.id,
+        contactName,
+        contactEmail,
+        contactPhone: getStringArg(args, 'contact_phone'),
+        notes: getStringArg(args, 'notes'),
+      });
+
+      return JSON.stringify({
+        ...result,
+        bookedSlot: {
+          id: resolved.id,
+          label: resolved.label,
+          startsAt: resolved.startsAt,
+        },
+      });
+    } catch (error) {
+      if (error instanceof ServiceError) {
+        logger.warn(`create_booking failed: ${error.message}`);
+        const availability = await propertiesService.getAvailability(propertyId, {}).catch(() => null);
+        return JSON.stringify({
+          error: error.message,
+          statusCode: error.statusCode,
+          availableSlots: availability?.slots.map((slot) => ({
+            id: slot.id,
+            label: slot.label,
+            startsAt: slot.startsAt,
+          })) ?? [],
+        });
+      }
+      throw error;
+    }
   }
 
   private async cancelBooking(userId: string, args: Record<string, unknown>): Promise<string> {
@@ -117,12 +206,19 @@ export class ToolHandlers {
       return JSON.stringify({ error: 'booking_id is required' });
     }
 
-    const booking = await bookingsService.cancelBookingFromTool(userId, bookingId);
-    return JSON.stringify({ booking, cancelled: true });
+    try {
+      const booking = await bookingsService.cancelBookingFromTool(userId, bookingId);
+      return JSON.stringify({ booking, cancelled: true });
+    } catch (error) {
+      if (error instanceof ServiceError) {
+        return JSON.stringify({ error: error.message, statusCode: error.statusCode });
+      }
+      throw error;
+    }
   }
 
   private async sendQuestionToLister(context: AgentContext, args: Record<string, unknown>): Promise<string> {
-    const propertyId = getStringArg(args, 'property_id') ?? context.propertyId;
+    const propertyId = this.resolvePropertyId(args, context);
     const rawQuestionText = getStringArg(args, 'question_text');
 
     if (!rawQuestionText) {
@@ -163,7 +259,46 @@ export class ToolHandlers {
       canonicalAttributes: getStringArrayArg(args, 'canonical_attributes'),
     });
 
-    return JSON.stringify(result);
+    if (result.alreadyAsked) {
+      return JSON.stringify({
+        alreadyAsked: true,
+        questionId: result.questionId,
+        questionText: result.questionText,
+        status: result.status,
+        delivered: true,
+        message:
+          "A similar question is already open with the lister. Tell the user you've already asked and will share the answer when they respond. Do not offer to ask again.",
+      });
+    }
+
+    return JSON.stringify({
+      alreadyAsked: false,
+      questionId: result.questionId,
+      questionText: result.questionText,
+      status: result.status,
+      delivered: result.delivered,
+    });
+  }
+
+  private async getOpenListerQuestions(
+    context: AgentContext,
+    args: Record<string, unknown>,
+  ): Promise<string> {
+    const propertyId = this.resolvePropertyId(args, context);
+    const questions = await listerService.listOpenQuestionsForSession({
+      propertyId,
+      sessionId: context.sessionId,
+      userId: context.userId,
+    });
+
+    return JSON.stringify({
+      openQuestions: questions.map((question) => ({
+        questionId: question.id,
+        questionText: question.questionText,
+        canonicalAttributes: question.canonicalAttributes ?? [],
+      })),
+      count: questions.length,
+    });
   }
 
   private async captureContact(userId: string, args: Record<string, unknown>): Promise<string> {
@@ -189,11 +324,15 @@ export class ToolHandlers {
     return JSON.stringify({ lead, captured: true });
   }
 
-  private async requestCallback(userId: string, args: Record<string, unknown>): Promise<string> {
-    const propertyId = getStringArg(args, 'property_id');
+  private async requestCallback(
+    userId: string,
+    args: Record<string, unknown>,
+    context: AgentContext,
+  ): Promise<string> {
+    const propertyId = this.resolvePropertyId(args, context);
     const contact = getStringArg(args, 'contact');
 
-    if (!propertyId || !contact) {
+    if (!contact) {
       return JSON.stringify({ error: 'property_id and contact are required' });
     }
 
@@ -208,7 +347,11 @@ export class ToolHandlers {
     return JSON.stringify({ callback, requested: true });
   }
 
-  private async readSessionMemory(sessionId: string, args: Record<string, unknown>): Promise<string> {
+  private async readSessionMemory(
+    sessionId: string,
+    args: Record<string, unknown>,
+    context: AgentContext,
+  ): Promise<string> {
     const session = await prisma.chatSession.findFirst({
       where: { id: sessionId, ...notDeleted() },
     });
@@ -218,7 +361,7 @@ export class ToolHandlers {
     }
 
     const memory = parseSessionMemory(session.contextMemory);
-    const propertyId = getStringArg(args, 'property_id') ?? session.propertyId;
+    const propertyId = this.resolvePropertyId(args, context);
 
     const approved = await prisma.approvedAnswer.findMany({
       where: { propertyId, ...notDeleted() },

@@ -52,18 +52,27 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'create_booking',
-      description: 'Book a viewing slot for the authenticated user',
+      description:
+        'Book a viewing slot for the authenticated user. Prefer slot_id from the latest get_availability response. If the user names a time in words, also pass slot_label so the server can resolve the correct free slot.',
       parameters: {
         type: 'object',
         properties: {
           property_id: { type: 'string' },
-          slot_id: { type: 'string' },
+          slot_id: { type: 'string', description: 'Exact slot id from get_availability' },
+          slot_label: {
+            type: 'string',
+            description: 'Human time the user chose, e.g. "Sunday 9 August, 5:00–5:30 pm"',
+          },
+          preferred_starts_at: {
+            type: 'string',
+            description: 'Optional ISO startsAt from get_availability for the chosen slot',
+          },
           contact_name: { type: 'string' },
           contact_email: { type: 'string' },
           contact_phone: { type: 'string' },
           notes: { type: 'string' },
         },
-        required: ['property_id', 'slot_id', 'contact_name', 'contact_email'],
+        required: ['property_id', 'contact_name', 'contact_email'],
       },
     },
   },
@@ -86,7 +95,7 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'send_question_to_lister',
       description:
-        'Escalate an unanswered question to the property lister. question_text must be a clear standalone question a lister can answer without chat history (never bare follow-ups like "why" or "ok").',
+        'Escalate an unanswered question to the property lister. question_text must be a clear standalone question a lister can answer without chat history (never bare follow-ups like "why" or "ok"). If a similar OPEN question already exists, returns alreadyAsked=true — tell the user you already asked and will relay the answer; do not claim you sent a new question.',
       parameters: {
         type: 'object',
         properties: {
@@ -103,6 +112,20 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           },
         },
         required: ['property_id', 'question_text'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_open_lister_questions',
+      description:
+        'List OPEN (unanswered) questions already sent to the lister for this session/user on the property. Use before offering to escalate if unsure whether a similar question is already pending.',
+      parameters: {
+        type: 'object',
+        properties: {
+          property_id: { type: 'string' },
+        },
       },
     },
   },
