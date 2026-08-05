@@ -1,4 +1,4 @@
-import type { LeadStatus } from '#generated/client.js';
+import type { LeadStatus } from '../../../generated/client.js';
 
 export interface SafeContactLead {
   id: string;

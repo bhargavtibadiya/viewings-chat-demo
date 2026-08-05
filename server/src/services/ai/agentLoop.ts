@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import type { AnswerStatus, ChatMessage, ListingType } from '#generated/client.js';
+import type { AnswerStatus, ChatMessage, ListingType } from '../../generated/client.js';
 import { env } from '../../config/env.js';
 import { getOpenAIClient, getOpenAIModel } from './openai.client.js';
 import { toolDefinitions } from './tools/toolDefinitions.js';

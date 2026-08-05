@@ -1,4 +1,4 @@
-import type { ApprovedAnswer } from '#generated/client.js';
+import type { ApprovedAnswer } from '../../../generated/client.js';
 import type { SessionMemory, SessionMemoryFact } from '../types/ai.types.js';
 
 export interface MemoryAttribute {

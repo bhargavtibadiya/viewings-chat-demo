@@ -1,4 +1,4 @@
-import type { ListingType, Prisma } from '#generated/client.js';
+import type { ListingType, Prisma } from '../../../../generated/client.js';
 import prisma from '../../../../config/prisma.js';
 import { addDays, atLocalTimeInTimezone } from '../../../../utils/helpers/date.js';
 import { TIMEZONE } from '../../../../utils/constants/pagination.js';

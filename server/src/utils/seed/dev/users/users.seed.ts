@@ -1,4 +1,4 @@
-import type { UserRole } from '#generated/client.js';
+import type { UserRole } from '../../../../generated/client.js';
 import bcrypt from 'bcryptjs';
 import prisma from '../../../../config/prisma.js';
 import { env } from '../../../../config/env.js';

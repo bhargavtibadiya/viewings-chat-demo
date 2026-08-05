@@ -5,7 +5,7 @@ import { env } from '../config/env.js';
 import prisma from '../config/prisma.js';
 import { sendUnauthorized, sendForbidden } from '../utils/helpers/response.js';
 import { notDeleted } from '../utils/helpers/softDelete.js';
-import type { UserRole } from '#generated/client.js';
+import type { UserRole } from '../generated/client.js';
 import type { AuthenticatedUser } from '../types/express.js';
 
 interface JwtPayload {

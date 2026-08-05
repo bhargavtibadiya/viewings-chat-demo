@@ -1,4 +1,4 @@
-import type { UserRole } from '#generated/client.js';
+import type { UserRole } from '../../../generated/client.js';
 
 export interface SafeUser {
   id: string;

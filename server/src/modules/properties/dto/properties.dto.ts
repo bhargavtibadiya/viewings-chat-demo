@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ListingType } from '#generated/client.js';
+import { ListingType } from '../../../generated/client.js';
 import { PAGINATION } from '../../../utils/constants/pagination.js';
 
 export const PropertyQueryDto = z.object({

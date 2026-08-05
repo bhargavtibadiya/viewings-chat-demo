@@ -8,7 +8,6 @@
     ],
     "outDir": "dist",
     "rootDir": "src",
-    "baseUrl": ".",
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -22,12 +21,7 @@
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "paths": {
-      "#generated/client.js": [
-        "./src/generated/client"
-      ]
-    }
+    "sourceMap": true
   },
   "include": [
     "src/**/*"

@@ -1,4 +1,4 @@
-import type { QuestionStatus } from '#generated/client.js';
+import type { QuestionStatus } from '../../../generated/client.js';
 
 export interface SafeUnansweredQuestion {
   id: string;

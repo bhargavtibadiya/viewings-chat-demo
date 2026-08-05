@@ -1,4 +1,4 @@
-import type { AnswerStatus } from '#generated/client.js';
+import type { AnswerStatus } from '../../../generated/client.js';
 import type { ChatAction, ChatFact } from '../types/ai.types.js';
 
 export function pickActions(answerStatus: AnswerStatus, listingType: 'RENTAL' | 'SALE'): ChatAction[] {

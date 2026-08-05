@@ -1,4 +1,4 @@
-import type { AnswerStatus } from '#generated/client.js';
+import type { AnswerStatus } from '../../../generated/client.js';
 
 export interface ChatAction {
   type: string;

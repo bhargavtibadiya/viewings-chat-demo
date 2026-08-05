@@ -6,7 +6,7 @@ import { notDeleted } from '../../utils/helpers/softDelete.js';
 import { createServiceError } from '../../utils/helpers/serviceError.js';
 import type { LoginDtoType } from './dto/auth.dto.js';
 import type { LoginResponse, SafeUser } from './types/auth.types.js';
-import type { User } from '#generated/client.js';
+import type { User } from '../../generated/client.js';
 
 export class AuthService {
   private toSafeUser(user: Pick<User, 'id' | 'email' | 'name' | 'role'>): SafeUser {

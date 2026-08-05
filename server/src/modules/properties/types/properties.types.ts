@@ -1,4 +1,4 @@
-import type { ListingType } from '#generated/client.js';
+import type { ListingType } from '../../../generated/client.js';
 
 export interface SafeListingAttribute {
   key: string;

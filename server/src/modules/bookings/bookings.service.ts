@@ -1,4 +1,4 @@
-import type { Booking, Property, AvailabilitySlot } from '#generated/client.js';
+import type { Booking, Property, AvailabilitySlot } from '../../generated/client.js';
 import prisma from '../../config/prisma.js';
 import { createServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';

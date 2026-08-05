@@ -1,4 +1,4 @@
-import type { Prisma } from '#generated/client.js';
+import type { Prisma } from '../../generated/client.js';
 import prisma from '../../config/prisma.js';
 import { env } from '../../config/env.js';
 import { getOpenAIModel } from '../../services/ai/openai.client.js';

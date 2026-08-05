@@ -1,4 +1,4 @@
-import type { Prisma, ChatMessage, ChatSession } from '#generated/client.js';
+import type { Prisma, ChatMessage, ChatSession } from '../../generated/client.js';
 import prisma from '../../config/prisma.js';
 import { agentLoop } from '../../services/ai/agentLoop.js';
 import {

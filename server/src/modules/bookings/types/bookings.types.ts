@@ -1,4 +1,4 @@
-import type { BookingStatus } from '#generated/client.js';
+import type { BookingStatus } from '../../../generated/client.js';
 
 export interface SafeBooking {
   id: string;

@@ -1,6 +1,6 @@
 import { isRecord, isStringArray } from '../../../utils/helpers/json.js';
 import type { SessionMemory, SessionMemoryFact } from '../types/ai.types.js';
-import type { Prisma } from '#generated/client.js';
+import type { Prisma } from '../../../generated/client.js';
 
 export function emptySessionMemory(): SessionMemory {
   return { facts: [], prefs: {} };
