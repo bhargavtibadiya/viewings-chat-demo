@@ -13,7 +13,7 @@ import {
 } from '@/store/chat/chat.slice';
 import { getPropertiesThunk } from '@/store/properties/properties.thunk';
 import { getPropertyByIdThunk } from '@/store/properties/properties.thunk';
-import { findPropertyByFixtureKey, formatListingPrice, formatListingType } from '@/utils/helpers/propertyFormatters';
+import { formatListingPrice, formatListingType } from '@/utils/helpers/propertyFormatters';
 import type { EvidencePrompt } from '@/utils/helpers/evidencePrompts';
 import { setActiveSessionId } from '@/store/demo/demo.slice';
 import {
@@ -124,14 +124,22 @@ export function ChatPage(): React.ReactElement {
   const handleSend = useCallback(
     async (content: string): Promise<void> => {
       if (!session || content.trim().length === 0) return;
+      if (session.propertyId !== propertyId) {
+        // Stale session after a property switch — refresh before sending.
+        await dispatch(getSessionThunk({ propertyId }));
+        return;
+      }
       setDraft('');
       requestAnimationFrame(() => {
-        textareaRef.current?.focus();
+        if (textareaRef.current) {
+          textareaRef.current.style.height = '';
+          textareaRef.current.focus();
+        }
       });
       await dispatch(sendMessageThunk({ sessionId: session.id, content: content.trim() }));
       textareaRef.current?.focus();
     },
-    [dispatch, session],
+    [dispatch, propertyId, session],
   );
 
   const handleLoadOlder = useCallback(() => {
@@ -163,13 +171,8 @@ export function ChatPage(): React.ReactElement {
   };
 
   const handlePromptSelect = (prompt: EvidencePrompt): void => {
-    const targetProperty = findPropertyByFixtureKey(properties, prompt.fixtureKey);
-    if (targetProperty && targetProperty.id !== propertyId) {
-      navigate(`/chat/${targetProperty.id}`, {
-        state: { pendingMessage: prompt.message },
-      });
-      return;
-    }
+    // Always stay on the active property chat — send as a normal human message.
+    // Fixture keys are metadata for the Demo control panel only.
     void handleSend(prompt.message);
   };
 
@@ -255,18 +258,23 @@ export function ChatPage(): React.ReactElement {
           )}
 
           <form
-            className="flex items-center gap-2 border-t border-[var(--color-border-light)] bg-[var(--color-bg-base)] px-3 py-2.5"
+            className="flex items-end gap-2 border-t border-[var(--color-border-light)] bg-[var(--color-bg-base)] px-3 py-2.5"
             onSubmit={handleSubmit}
           >
             <textarea
               ref={textareaRef}
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                const el = event.target;
+                el.style.height = 'auto';
+                el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
+              }}
               onKeyDown={handleDraftKeyDown}
-              placeholder="Ask about this listing…"
-              rows={1}
+              placeholder="Ask about this listing… (Shift+Enter for new line)"
+              rows={2}
               disabled={isChatLoading}
-              className="min-h-[36px] max-h-24 flex-1 resize-none rounded-[var(--radius-sm)] border-[1.5px] border-[var(--color-border-medium)] bg-[var(--color-bg-surface)] px-3 py-2 text-[var(--text-sm)] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:shadow-[var(--shadow-input-focus)]"
+              className="min-h-[52px] max-h-36 flex-1 resize-none overflow-y-auto rounded-[var(--radius-sm)] border-[1.5px] border-[var(--color-border-medium)] bg-[var(--color-bg-surface)] px-3 py-2 text-[var(--text-sm)] leading-5 text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:shadow-[var(--shadow-input-focus)]"
             />
             <Button
               type="submit"
@@ -275,7 +283,7 @@ export function ChatPage(): React.ReactElement {
               iconOnly
               disabled={draft.trim().length === 0 || sendLoading || askListerLoading || isChatLoading}
               aria-label="Send message"
-              className="shrink-0"
+              className="mb-0.5 shrink-0"
             >
               <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Button>

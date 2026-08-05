@@ -39,6 +39,9 @@ export function EvidencePicker({
           Try this
         </p>
       )}
+      <p className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
+        Sends as your message on this property — does not switch listings.
+      </p>
       <Select
         options={options}
         value={selectedId}
