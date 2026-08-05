@@ -41,6 +41,8 @@ export interface SafeAvailabilitySlot {
   endsAt: string;
   timezone: string;
   isBooked: boolean;
+  /** Human-readable NZ label for the agent and UI, e.g. "Fri 7 Aug 2026, 9:00 am" */
+  label: string;
 }
 
 export interface PaginatedPropertiesResponse {

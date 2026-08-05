@@ -3,7 +3,7 @@ import prisma from '../../config/prisma.js';
 import { createServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';
 import { parseJsonStringArray } from '../../utils/helpers/json.js';
-import { formatNzDateTime } from '../../utils/helpers/date.js';
+import { formatNzDateTime, formatNzTime } from '../../utils/helpers/date.js';
 import type { PropertyQueryDtoType, AvailabilityQueryDtoType } from './dto/properties.dto.js';
 import type {
   PaginatedPropertiesResponse,
@@ -218,6 +218,7 @@ export class PropertiesService {
         endsAt: slot.endsAt.toISOString(),
         timezone: slot.timezone,
         isBooked: slot.isBooked,
+        label: this.formatSlotLabel(slot.startsAt, slot.endsAt, slot.timezone),
       })),
     };
   }
@@ -245,7 +246,7 @@ export class PropertiesService {
   }
 
   formatSlotLabel(startsAt: Date, endsAt: Date, timezone: string): string {
-    return `${formatNzDateTime(startsAt)} to ${formatNzDateTime(endsAt)} (${timezone})`;
+    return `${formatNzDateTime(startsAt)} to ${formatNzTime(endsAt, timezone)} (${timezone})`;
   }
 }
 

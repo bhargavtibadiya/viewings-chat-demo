@@ -9,6 +9,10 @@ import {
   upsertMemoryFact,
 } from '../../services/ai/tools/sessionMemory.js';
 import { parseListerAnswer } from '../../services/ai/helpers/parseListerAnswer.js';
+import {
+  findSimilarOpenQuestion,
+  type OpenListerQuestionCandidate,
+} from '../../services/ai/helpers/openListerQuestions.js';
 import type { AnswerQuestionDtoType, CreateQuestionInput } from './dto/lister.dto.js';
 import type {
   AnswerQuestionResult,
@@ -68,6 +72,46 @@ export class ListerService {
     return questions.map((question) => this.toSafeQuestion(question));
   }
 
+  async listOpenQuestionsForSession(input: {
+    propertyId: string;
+    sessionId?: string;
+    userId?: string;
+  }): Promise<OpenListerQuestionCandidate[]> {
+    const ownershipFilters: Prisma.UnansweredQuestionWhereInput[] = [];
+    if (input.sessionId) {
+      ownershipFilters.push({ sessionId: input.sessionId });
+    }
+    if (input.userId) {
+      ownershipFilters.push({ userId: input.userId });
+    }
+
+    const questions = await prisma.unansweredQuestion.findMany({
+      where: {
+        propertyId: input.propertyId,
+        status: 'OPEN',
+        ...notDeleted(),
+        ...(ownershipFilters.length > 0 ? { OR: ownershipFilters } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        questionText: true,
+        canonicalAttributes: true,
+        resolvedIntent: true,
+      },
+    });
+
+    return questions.map((question) => ({
+      id: question.id,
+      questionText: question.questionText,
+      canonicalAttributes: this.extractAttributesFromQuestion(question.canonicalAttributes).filter(
+        (attr) => attr !== 'general',
+      ),
+      resolvedIntent: question.resolvedIntent,
+    }));
+  }
+
   async createQuestion(input: CreateQuestionInput): Promise<CreateQuestionResult> {
     const property = await prisma.property.findFirst({
       where: { id: input.propertyId, ...notDeleted() },
@@ -77,7 +121,35 @@ export class ListerService {
       throw createServiceError(404, 'Property not found');
     }
 
-    const existingOpen = await prisma.unansweredQuestion.findFirst({
+    const openQuestions = await this.listOpenQuestionsForSession({
+      propertyId: input.propertyId,
+      sessionId: input.sessionId,
+      userId: input.userId,
+    });
+
+    const similar = findSimilarOpenQuestion(openQuestions, {
+      questionText: input.questionText,
+      canonicalAttributes: input.canonicalAttributes,
+    });
+
+    if (similar) {
+      const matched = await prisma.unansweredQuestion.findFirst({
+        where: { id: similar.id, ...notDeleted() },
+      });
+
+      if (matched) {
+        return {
+          questionId: matched.id,
+          status: matched.status,
+          delivered: true,
+          alreadyAsked: true,
+          questionText: matched.questionText,
+        };
+      }
+    }
+
+    // Property-wide exact text guard (legacy): avoid duplicate OPEN rows with identical wording.
+    const existingExact = await prisma.unansweredQuestion.findFirst({
       where: {
         propertyId: input.propertyId,
         status: 'OPEN',
@@ -86,11 +158,13 @@ export class ListerService {
       },
     });
 
-    if (existingOpen) {
+    if (existingExact) {
       return {
-        questionId: existingOpen.id,
-        status: existingOpen.status,
+        questionId: existingExact.id,
+        status: existingExact.status,
         delivered: true,
+        alreadyAsked: true,
+        questionText: existingExact.questionText,
       };
     }
 
@@ -114,6 +188,8 @@ export class ListerService {
       questionId: question.id,
       status: question.status,
       delivered: true,
+      alreadyAsked: false,
+      questionText: question.questionText,
     };
   }
 
