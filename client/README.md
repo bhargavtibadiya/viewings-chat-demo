@@ -46,7 +46,7 @@ Set `VITE_API_URL` in `.env` to your API origin, for example `http://localhost:3
 
 ## Evidence sidebar
 
-Chat includes E-01 through E-11 chips from the implementation plan. Chips that need a fixture property attempt to jump to a listing whose `fixtureKey` matches the seed metadata.
+Chat includes evidence cases **E-01 through E-11** (with E-11a–e positive sub-cases) from the Evidence Appendix. **Try this** always sends the selected prompt as a human message on the **current** property chat — it does not switch listings. Fixture keys remain available on the Demo control panel for jumping to a matching seeded property when you want that intentionally.
 
 ## Notes
 
