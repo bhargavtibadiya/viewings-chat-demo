@@ -132,18 +132,28 @@ export class ToolHandlers {
     context: AgentContext,
   ): Promise<string> {
     const propertyId = this.resolvePropertyId(args, context);
-    const contactName = getStringArg(args, 'contact_name');
-    const contactEmail = getStringArg(args, 'contact_email');
     const slotIdArg = getStringArg(args, 'slot_id');
     const preferredStartsAt = getStringArg(args, 'preferred_starts_at');
     const slotLabel = getStringArg(args, 'slot_label');
 
-    if (!contactName || !contactEmail) {
+    if (!slotIdArg && !preferredStartsAt && !slotLabel) {
       return JSON.stringify({
         error: 'Missing required booking fields',
-        required: ['property_id', 'contact_name', 'contact_email', 'slot_id or slot_label'],
+        required: ['property_id', 'slot_id or slot_label'],
       });
     }
+
+    const user = await prisma.user.findFirst({
+      where: { id: userId, ...notDeleted() },
+      select: { name: true, email: true },
+    });
+
+    if (!user) {
+      return JSON.stringify({ error: 'Authenticated user not found' });
+    }
+
+    const contactName = getStringArg(args, 'contact_name') ?? user.name;
+    const contactEmail = getStringArg(args, 'contact_email') ?? user.email;
 
     try {
       const availability = await propertiesService.getAvailability(propertyId, {});
@@ -161,6 +171,8 @@ export class ToolHandlers {
             id: slot.id,
             label: slot.label,
             startsAt: slot.startsAt,
+            endsAt: slot.endsAt,
+            timezone: slot.timezone,
           })),
         });
       }
@@ -193,6 +205,8 @@ export class ToolHandlers {
             id: slot.id,
             label: slot.label,
             startsAt: slot.startsAt,
+            endsAt: slot.endsAt,
+            timezone: slot.timezone,
           })) ?? [],
         });
       }

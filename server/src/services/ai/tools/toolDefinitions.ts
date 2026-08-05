@@ -53,7 +53,7 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'create_booking',
       description:
-        'Book a viewing slot for the authenticated user. Prefer slot_id from the latest get_availability response. If the user names a time in words, also pass slot_label so the server can resolve the correct free slot.',
+        'Book a viewing slot for the authenticated user. Prefer slot_id from the latest get_availability response. Contact name and email are taken from the user profile automatically — do not ask the seeker for them. If the user names a time in words, also pass slot_label so the server can resolve the correct free slot.',
       parameters: {
         type: 'object',
         properties: {
@@ -67,12 +67,10 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             type: 'string',
             description: 'Optional ISO startsAt from get_availability for the chosen slot',
           },
-          contact_name: { type: 'string' },
-          contact_email: { type: 'string' },
           contact_phone: { type: 'string' },
           notes: { type: 'string' },
         },
-        required: ['property_id', 'contact_name', 'contact_email'],
+        required: ['property_id'],
       },
     },
   },
