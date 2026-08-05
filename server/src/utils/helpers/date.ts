@@ -76,6 +76,51 @@ export function endOfDayInTimezone(date: Date, timeZone: string = TIMEZONE): Dat
   return new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
 }
 
+/**
+ * Build a UTC instant for a wall-clock time in `timeZone` on the local calendar
+ * day of `reference` plus `dayOffset` (e.g. hour 9 → 9:00 am Pacific/Auckland).
+ */
+export function atLocalTimeInTimezone(
+  reference: Date,
+  dayOffset: number,
+  hour: number,
+  minute: number = 0,
+  timeZone: string = TIMEZONE,
+): Date {
+  const dayStart = startOfDayInTimezone(reference, timeZone);
+  const targetDay = addDays(dayStart, dayOffset);
+
+  const dateKey = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(targetDay);
+
+  const [yearText, monthText, dayText] = dateKey.split('-');
+  const year = parseInt(yearText ?? '1970', 10);
+  const month = parseInt(monthText ?? '1', 10);
+  const day = parseInt(dayText ?? '1', 10);
+  const desiredAsUtc = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+
+  // First guess: treat desired wall clock as UTC, then subtract TZ offset.
+  let guess = new Date(desiredAsUtc);
+  let offset = getTimezoneOffsetMs(guess, timeZone);
+  guess = new Date(desiredAsUtc - offset);
+  // Refine once so DST transitions land on the correct offset.
+  offset = getTimezoneOffsetMs(guess, timeZone);
+  return new Date(desiredAsUtc - offset);
+}
+
+export function formatNzTime(date: Date, timeZone: string = TIMEZONE): string {
+  return new Intl.DateTimeFormat('en-NZ', {
+    timeZone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
+}
+
 export interface DateRange {
   from: Date;
   to: Date;
