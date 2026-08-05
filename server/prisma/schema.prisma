@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  SEEKER
+  LISTER
+  DEMO_ADMIN
+}
+
+enum ListingType {
+  RENTAL
+  SALE
+}
+
+enum AnswerStatus {
+  VERIFIED
+  LIMITED
+  UNKNOWN
+}
+
+enum QuestionStatus {
+  OPEN
+  ANSWERED
+  DISMISSED
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum LeadStatus {
+  NEW
+  HANDLED
+}
+
+enum AttributeSource {
+  LISTING
+  LISTER_APPROVED
+  SEED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  sessions            ChatSession[]
+  bookings            Booking[]
+  ownedProperties     Property[]           @relation("PropertyLister")
+  answeredQuestions   UnansweredQuestion[] @relation("QuestionAnswerer")
+  approvedAnswers     ApprovedAnswer[]
+  contactLeads        ContactLead[]
+  callbackRequests    CallbackRequest[]
+  unansweredQuestions UnansweredQuestion[] @relation("QuestionAsker")
+
+  @@index([role])
+  @@index([deletedAt])
+}
+
+model Property {
+  id            String      @id @default(cuid())
+  title         String
+  slug          String      @unique
+  listingType   ListingType
+  status        String      @default("ACTIVE")
+  suburb        String
+  city          String      @default("Auckland")
+  addressLine   String
+  bedrooms      Int
+  bathrooms     Int
+  parking       Int         @default(0)
+  rentWeekly    Int?
+  bond          Int?
+  price         Int?
+  availableFrom DateTime?
+  description   String
+  heroImageUrl  String
+  imageUrls     Json        @default("[]")
+  fixtureKey    String?
+  listerId      String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+
+  lister              User                 @relation("PropertyLister", fields: [listerId], references: [id])
+  attributes          ListingAttribute[]
+  availabilitySlots   AvailabilitySlot[]
+  bookings            Booking[]
+  sessions            ChatSession[]
+  unansweredQuestions UnansweredQuestion[]
+  approvedAnswers     ApprovedAnswer[]
+  contactLeads        ContactLead[]
+  callbackRequests    CallbackRequest[]
+
+  @@index([listingType, suburb, bedrooms])
+  @@index([deletedAt])
+  @@index([listerId])
+}
+
+model ListingAttribute {
+  id         String          @id @default(cuid())
+  propertyId String
+  key        String
+  value      Json
+  confidence Float?
+  source     AttributeSource @default(SEED)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  deletedAt  DateTime?
+
+  property Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, key])
+  @@index([propertyId])
+  @@index([deletedAt])
+}
+
+model AvailabilitySlot {
+  id         String    @id @default(cuid())
+  propertyId String
+  startsAt   DateTime
+  endsAt     DateTime
+  timezone   String    @default("Pacific/Auckland")
+  isBooked   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  property Property @relation(fields: [propertyId], references: [id])
+  booking  Booking?
+
+  @@index([propertyId, startsAt])
+  @@index([deletedAt])
+}
+
+model Booking {
+  id           String        @id @default(cuid())
+  propertyId   String
+  userId       String
+  slotId       String        @unique
+  status       BookingStatus @default(CONFIRMED)
+  contactName  String
+  contactEmail String
+  contactPhone String?
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  property Property         @relation(fields: [propertyId], references: [id])
+  user     User             @relation(fields: [userId], references: [id])
+  slot     AvailabilitySlot @relation(fields: [slotId], references: [id])
+
+  @@index([userId])
+  @@index([propertyId])
+  @@index([deletedAt])
+}
+
+model ChatSession {
+  id            String    @id @default(cuid())
+  userId        String
+  propertyId    String
+  contextMemory Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  user                User                 @relation(fields: [userId], references: [id])
+  property            Property             @relation(fields: [propertyId], references: [id])
+  messages            ChatMessage[]
+  turnLogs            TurnLog[]
+  unansweredQuestions UnansweredQuestion[]
+
+  @@unique([userId, propertyId])
+  @@index([deletedAt])
+}
+
+model ChatMessage {
+  id           String        @id @default(cuid())
+  sessionId    String
+  role         MessageRole
+  content      String
+  actions      Json?
+  answerStatus AnswerStatus?
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  session ChatSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId, createdAt])
+  @@index([deletedAt])
+}
+
+model TurnLog {
+  id                 String       @id @default(cuid())
+  sessionId          String
+  userMessageId      String
+  assistantMessageId String
+  intents            Json         @default("[]")
+  attributes         Json         @default("[]")
+  entities           Json         @default("[]")
+  toolsCalled        Json         @default("[]")
+  sources            Json         @default("[]")
+  answerStatus       AnswerStatus
+  cta                Json?
+  rawModelTrace      Json?
+  latencyMs          Int
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  deletedAt          DateTime?
+
+  session ChatSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId, createdAt])
+}
+
+model ApprovedAnswer {
+  id                  String    @id @default(cuid())
+  propertyId          String
+  canonicalAttributes String[]
+  questionPattern     String?
+  answerText          String
+  approvedById        String
+  approvedAt          DateTime  @default(now())
+  expiresAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  property   Property @relation(fields: [propertyId], references: [id])
+  approvedBy User     @relation(fields: [approvedById], references: [id])
+
+  @@index([propertyId])
+  @@index([deletedAt])
+}
+
+model UnansweredQuestion {
+  id                  String         @id @default(cuid())
+  propertyId          String
+  sessionId           String?
+  userId              String?
+  status              QuestionStatus @default(OPEN)
+  questionText        String
+  resolvedIntent      String?
+  canonicalAttributes Json?
+  answerText          String?
+  answeredById        String?
+  answeredAt          DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  deletedAt           DateTime?
+
+  property   Property     @relation(fields: [propertyId], references: [id])
+  session    ChatSession? @relation(fields: [sessionId], references: [id])
+  user       User?        @relation("QuestionAsker", fields: [userId], references: [id])
+  answeredBy User?        @relation("QuestionAnswerer", fields: [answeredById], references: [id])
+
+  @@index([status, propertyId])
+  @@index([deletedAt])
+}
+
+model ContactLead {
+  id         String     @id @default(cuid())
+  userId     String?
+  propertyId String?
+  name       String
+  email      String
+  phone      String?
+  purpose    String
+  consent    Boolean    @default(false)
+  status     LeadStatus @default(NEW)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  deletedAt  DateTime?
+
+  user     User?     @relation(fields: [userId], references: [id])
+  property Property? @relation(fields: [propertyId], references: [id])
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model CallbackRequest {
+  id            String     @id @default(cuid())
+  userId        String?
+  propertyId    String?
+  listerId      String
+  preferredTime String?
+  contact       String
+  notes         String?
+  status        LeadStatus @default(NEW)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
+
+  user     User?     @relation(fields: [userId], references: [id])
+  property Property? @relation(fields: [propertyId], references: [id])
+
+  @@index([listerId, status])
+  @@index([deletedAt])
+}
