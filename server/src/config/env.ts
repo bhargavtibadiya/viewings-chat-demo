@@ -8,6 +8,7 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default('gpt-5.6-luna'),
+  OPENAI_REASONING_EFFORT: z.enum(['none', 'low', 'medium', 'high']).default('none'),
   OPENAI_TIMEOUT_MS: z.string().default('60000').transform((val) => parseInt(val, 10)).pipe(z.number().int().positive()),
   APP_URL: z.string().url().default('http://localhost:5173'),
   CORS_ORIGINS: z
