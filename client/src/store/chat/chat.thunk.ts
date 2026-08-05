@@ -11,8 +11,10 @@ import type {
   IGetMessagesThunkResponse,
   ISendMessageThunkPayload,
   ISendMessageThunkResponse,
+  IAskListerThunkPayload,
+  IAskListerThunkResponse,
 } from '@/store/chat/chat.types';
-import { getMessagesFetchKey } from '@/store/chat/chat.types';
+import { getMessagesFetchKey, CHAT_MESSAGES_DEFAULT_LIMIT } from '@/store/chat/chat.types';
 
 export const getSessionThunk = createAsyncThunk<
   IGetSessionThunkResponse,
@@ -55,7 +57,7 @@ export const getMessagesThunk = createAsyncThunk<
       const fetchKey = getMessagesFetchKey(arg.before);
       const cached = state.sessionMessagesCache[arg.sessionId];
 
-      if (cached?.fetchedKeys.includes(fetchKey)) {
+      if (!arg.skipCache && cached?.fetchedKeys.includes(fetchKey)) {
         return false;
       }
 
@@ -88,5 +90,32 @@ export const sendMessageThunk = createAsyncThunk<
   },
   {
     condition: (_, { getState }) => !getState().chat.sendMessageLoading,
+  },
+);
+
+export const askListerThunk = createAsyncThunk<
+  IAskListerThunkResponse,
+  IAskListerThunkPayload,
+  { rejectValue: ApiErrorData; state: RootState }
+>(
+  'chat/askLister',
+  async (data, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await chatService.askLister(data);
+      await dispatch(
+        getMessagesThunk({
+          sessionId: data.sessionId,
+          limit: CHAT_MESSAGES_DEFAULT_LIMIT,
+          skipCache: true,
+        }),
+      );
+      return response.data;
+    } catch (error: unknown) {
+      const fallback = getErrorMessage(error, 'Failed to send question to lister');
+      return rejectWithValue({ data: extractApiError(error, fallback) });
+    }
+  },
+  {
+    condition: (_, { getState }) => !getState().chat.askListerLoading,
   },
 );

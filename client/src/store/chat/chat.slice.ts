@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { getMessagesThunk, getSessionThunk, sendMessageThunk } from '@/store/chat/chat.thunk';
+import { getMessagesThunk, getSessionThunk, sendMessageThunk, askListerThunk } from '@/store/chat/chat.thunk';
 import type { ChatSliceInterface, IChatMessagesPagination, ISessionMessagesCache } from '@/store/chat/chat.types';
 import {
   CHAT_MESSAGES_FETCH_INITIAL_KEY,
@@ -22,6 +22,8 @@ const initialState: ChatSliceInterface = {
   sessionMessagesCache: {},
   sendMessageLoading: false,
   sendMessageError: null,
+  askListerLoading: false,
+  askListerError: null,
   lastTurn: null,
   showDebugStrip: true,
 };
@@ -242,7 +244,23 @@ const chatSlice = createSlice({
             state.messagesPagination,
           ),
         };
-      });
+      })
+      .addCase(askListerThunk.pending, (state) => ({
+        ...state,
+        askListerLoading: true,
+        askListerError: null,
+      }))
+      .addCase(askListerThunk.fulfilled, (state, action) => ({
+        ...state,
+        askListerLoading: false,
+        askListerError: null,
+        lastTurn: action.payload.data,
+      }))
+      .addCase(askListerThunk.rejected, (state, action) => ({
+        ...state,
+        askListerLoading: false,
+        askListerError: action.payload?.data.message ?? 'Failed to send question to lister',
+      }));
   },
 });
 

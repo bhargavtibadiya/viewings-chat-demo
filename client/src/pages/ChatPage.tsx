@@ -6,7 +6,7 @@ import { ChatLoadingSkeleton } from '@/components/chat/ChatLoadingSkeleton';
 import { ChatThread } from '@/components/chat/ChatThread';
 import { EvidencePicker, EvidenceSheet } from '@/components/chat/EvidenceSidebar';
 import { useAppDispatch, useAppSelector } from '@/store/store';
-import { getMessagesThunk, getSessionThunk, sendMessageThunk } from '@/store/chat/chat.thunk';
+import { getMessagesThunk, getSessionThunk, sendMessageThunk, askListerThunk } from '@/store/chat/chat.thunk';
 import {
   clearChatState,
   hydrateMessagesFromCache,
@@ -35,7 +35,10 @@ export function ChatPage(): React.ReactElement {
   const sessionMessagesCache = useAppSelector((state) => state.chat.sessionMessagesCache);
   const lastTurn = useAppSelector((state) => state.chat.lastTurn);
   const sendLoading = useAppSelector((state) => state.chat.sendMessageLoading);
+  const askListerLoading = useAppSelector((state) => state.chat.askListerLoading);
   const sendMessageError = useAppSelector((state) => state.chat.sendMessageError);
+  const askListerError = useAppSelector((state) => state.chat.askListerError);
+  const user = useAppSelector((state) => state.auth.user);
   const sessionLoading = useAppSelector((state) => state.chat.getSessionLoading);
   const messagesLoading = useAppSelector((state) => state.chat.getMessagesLoading);
   const loadingOlder = useAppSelector((state) => state.chat.getOlderMessagesLoading);
@@ -50,6 +53,10 @@ export function ChatPage(): React.ReactElement {
 
   useEffect(() => {
     if (propertyId.length === 0) return undefined;
+    if (user?.role === 'LISTER') {
+      navigate('/lister/questions', { replace: true });
+      return undefined;
+    }
     dispatch(clearChatState());
     dispatch(getPropertyByIdThunk({ propertyId }));
     dispatch(getSessionThunk({ propertyId }));
@@ -59,7 +66,7 @@ export function ChatPage(): React.ReactElement {
     return () => {
       dispatch(clearChatState());
     };
-  }, [dispatch, propertyId, properties.length]);
+  }, [dispatch, navigate, propertyId, properties.length, user?.role]);
 
   useEffect(() => {
     if (!session) return;
@@ -90,6 +97,31 @@ export function ChatPage(): React.ReactElement {
     sessionMessagesCache,
   ]);
 
+  useEffect(() => {
+    if (!session) return undefined;
+
+    const refreshMessages = (): void => {
+      dispatch(
+        getMessagesThunk({
+          sessionId: session.id,
+          limit: CHAT_MESSAGES_DEFAULT_LIMIT,
+          skipCache: true,
+        }),
+      );
+    };
+
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible') {
+        refreshMessages();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [dispatch, session]);
+
   const handleSend = useCallback(
     async (content: string): Promise<void> => {
       if (!session || content.trim().length === 0) return;
@@ -97,6 +129,43 @@ export function ChatPage(): React.ReactElement {
       await dispatch(sendMessageThunk({ sessionId: session.id, content: content.trim() }));
     },
     [dispatch, session],
+  );
+
+  const handleAskLister = useCallback(
+    async (action: IChatAction): Promise<void> => {
+      if (!session) return;
+
+      const payloadQuestion =
+        typeof action.payload?.questionText === 'string' ? action.payload.questionText : undefined;
+      const lastUserMessage = [...messages].reverse().find((message) => message.role === 'USER');
+      const questionText = payloadQuestion ?? lastUserMessage?.content ?? action.label;
+
+      const attributesRaw = action.payload?.canonicalAttributes;
+      const canonicalAttributes =
+        typeof attributesRaw === 'string'
+          ? attributesRaw.split(',').map((item) => item.trim()).filter((item) => item.length > 0)
+          : undefined;
+
+      await dispatch(
+        askListerThunk({
+          sessionId: session.id,
+          questionText,
+          canonicalAttributes,
+        }),
+      );
+    },
+    [dispatch, messages, session],
+  );
+
+  const handleAction = useCallback(
+    async (action: IChatAction): Promise<void> => {
+      if (action.type === 'ask_lister') {
+        await handleAskLister(action);
+        return;
+      }
+      await handleSend(action.label);
+    },
+    [handleAskLister, handleSend],
   );
 
   const handleLoadOlder = useCallback(() => {
@@ -119,7 +188,7 @@ export function ChatPage(): React.ReactElement {
   const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      if (draft.trim().length > 0 && !sendLoading && !isChatLoading) {
+      if (draft.trim().length > 0 && !sendLoading && !askListerLoading && !isChatLoading) {
         void handleSend(draft);
       }
     }
@@ -215,23 +284,28 @@ export function ChatPage(): React.ReactElement {
           ) : (
             <ChatThread
               messages={messages}
-              isThinking={sendLoading}
+              isThinking={sendLoading || askListerLoading}
               hasMoreOlder={hasMoreOlder}
               loadingOlder={loadingOlder}
               onLoadOlder={handleLoadOlder}
             />
           )}
 
-          {(getSessionError || getMessagesError || sendMessageError) && (
+          {(getSessionError || getMessagesError || sendMessageError || askListerError) && (
             <div className="border-t border-[var(--color-border-light)] px-3 py-2 text-[var(--text-sm)] text-[var(--color-error)]">
-              {sendMessageError ?? getMessagesError ?? getSessionError}
+              {askListerError ?? sendMessageError ?? getMessagesError ?? getSessionError}
             </div>
           )}
 
           {actionButtons.length > 0 && (
             <div className="flex flex-wrap gap-1.5 border-t border-[var(--color-border-light)] px-3 py-2">
               {actionButtons.map((action) => (
-                <ChatActionButton key={`${action.type}-${action.label}`} action={action} onSend={handleSend} />
+                <ChatActionButton
+                  key={`${action.type}-${action.label}`}
+                  action={action}
+                  disabled={sendLoading || askListerLoading}
+                  onAction={handleAction}
+                />
               ))}
             </div>
           )}
@@ -254,7 +328,7 @@ export function ChatPage(): React.ReactElement {
               variant="primary"
               size="sm"
               iconOnly
-              disabled={draft.trim().length === 0 || sendLoading || isChatLoading}
+              disabled={draft.trim().length === 0 || sendLoading || askListerLoading || isChatLoading}
               aria-label="Send message"
               className="shrink-0"
             >
@@ -289,16 +363,18 @@ export function ChatPage(): React.ReactElement {
 
 interface ChatActionButtonProps {
   action: IChatAction;
-  onSend: (message: string) => Promise<void>;
+  disabled?: boolean;
+  onAction: (action: IChatAction) => Promise<void>;
 }
 
-function ChatActionButton({ action, onSend }: ChatActionButtonProps): React.ReactElement {
+function ChatActionButton({ action, disabled = false, onAction }: ChatActionButtonProps): React.ReactElement {
   return (
     <Button
       variant="secondary"
       size="sm"
+      disabled={disabled}
       onClick={() => {
-        void onSend(action.label);
+        void onAction(action);
       }}
     >
       {action.label}
