@@ -23,6 +23,7 @@ export function errorHandler(
   _next: NextFunction,
 ): void {
   if (error instanceof ServiceError) {
+    logger.warn(`${error.statusCode} ${error.message}`);
     res.status(error.statusCode).json({
       success: false,
       message: error.message,
@@ -31,6 +32,7 @@ export function errorHandler(
   }
 
   if (isAppError(error) && typeof error.statusCode === 'number') {
+    logger.warn(`${error.statusCode} ${error.message}`);
     res.status(error.statusCode).json({
       success: false,
       message: error.message,

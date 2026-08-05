@@ -15,9 +15,12 @@ import listerRoutes from './modules/lister/lister.routes.js';
 import leadsRoutes from './modules/leads/leads.routes.js';
 import demoRoutes from './modules/demo/demo.routes.js';
 import { sendSuccess } from './utils/helpers/response.js';
+import { requestLogger } from './middleware/requestLogger.js';
+import { createLogger } from './utils/helpers/logger.js';
 
 process.env.TZ = env.TZ;
 
+const logger = createLogger('Server');
 const app = express();
 
 app.use(helmet());
@@ -39,6 +42,7 @@ app.use(
   }),
 );
 app.use(express.json({ limit: '1mb' }));
+app.use(requestLogger);
 app.use(generalLimiter);
 
 app.get(ROUTES.HEALTH, (_req, res) => {
@@ -57,7 +61,8 @@ app.use(ROUTES.DEMO.BASE, demoRoutes);
 app.use(errorHandler);
 
 app.listen(env.PORT, () => {
-  console.log(`Viewings chat API running on ${env.API_URL} (port ${env.PORT})`);
+  logger.info(`Viewings chat API running on ${env.API_URL} (port ${env.PORT})`);
+  logger.info(`Request logging enabled (NODE_ENV=${env.NODE_ENV})`);
 });
 
 export default app;
