@@ -14,6 +14,7 @@ import {
   sessionMemoryToJson,
   upsertMemoryFact,
 } from './sessionMemory.js';
+import { buildMemoryToolAttributes } from '../helpers/memoryAttributes.js';
 import type { AgentContext } from '../types/ai.types.js';
 
 export class ToolHandlers {
@@ -196,7 +197,11 @@ export class ToolHandlers {
       take: 20,
     });
 
-    return JSON.stringify({ memory, approvedAnswers: approved });
+    return JSON.stringify({
+      memory,
+      approvedAnswers: approved,
+      attributes: buildMemoryToolAttributes(memory, approved),
+    });
   }
 
   private async writeSessionMemory(sessionId: string, args: Record<string, unknown>): Promise<string> {
@@ -251,7 +256,28 @@ export class ToolHandlers {
       orderBy: { approvedAt: 'desc' },
     });
 
-    return JSON.stringify({ answers });
+    const answerAttributes = answers.flatMap((answer) => {
+      const canonical: string[] = [];
+      if (Array.isArray(answer.canonicalAttributes)) {
+        for (const item of answer.canonicalAttributes) {
+          if (typeof item === 'string') {
+            canonical.push(item);
+          }
+        }
+      }
+
+      if (canonical.length === 0) {
+        return [{ key: 'lister_answer', value: answer.answerText, source: 'lister_answer' }];
+      }
+
+      return canonical.map((key) => ({
+        key,
+        value: answer.answerText,
+        source: 'lister_answer',
+      }));
+    });
+
+    return JSON.stringify({ answers, attributes: answerAttributes });
   }
 }
 

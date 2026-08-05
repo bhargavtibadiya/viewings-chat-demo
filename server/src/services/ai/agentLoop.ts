@@ -17,45 +17,88 @@ function isToolCallMessage(message: OpenAI.Chat.Completions.ChatCompletionMessag
   return Boolean(message.tool_calls && message.tool_calls.length > 0);
 }
 
-function extractFactsFromToolResults(toolsCalled: ToolCallRecord[]): ChatFact[] {
+function parseAttributeEntries(
+  attributesValue: unknown,
+  defaultSource: string,
+): ChatFact[] {
+  if (!Array.isArray(attributesValue)) {
+    return [];
+  }
+
   const facts: ChatFact[] = [];
 
-  for (const tool of toolsCalled) {
-    if (tool.name === 'get_property' || tool.name === 'read_session_memory' || tool.name === 'get_approved_answers') {
-      try {
-        const parsed: unknown = JSON.parse(tool.result);
-        if (isRecord(parsed) && 'attributes' in parsed) {
-          const attributesValue = parsed.attributes;
-          if (Array.isArray(attributesValue)) {
-            for (const item of attributesValue) {
-              if (
-                typeof item === 'object' &&
-                item !== null &&
-                'key' in item &&
-                'value' in item &&
-                typeof item.key === 'string'
-              ) {
-                const value = item.value;
-                let valueText = '';
-                if (typeof value === 'string') {
-                  valueText = value;
-                } else if (typeof value === 'number' || typeof value === 'boolean') {
-                  valueText = String(value);
-                }
-                if (valueText && valueText !== 'unknown') {
-                  facts.push({
-                    attribute: item.key,
-                    value: valueText,
-                    source: 'listing_attribute',
-                  });
-                }
-              }
-            }
-          }
-        }
-      } catch {
-        logger.debug('Could not parse tool result for facts');
+  for (const item of attributesValue) {
+    if (
+      typeof item === 'object' &&
+      item !== null &&
+      'key' in item &&
+      'value' in item &&
+      typeof item.key === 'string'
+    ) {
+      const value = item.value;
+      let valueText = '';
+      if (typeof value === 'string') {
+        valueText = value;
+      } else if (typeof value === 'number' || typeof value === 'boolean') {
+        valueText = String(value);
       }
+
+      const source =
+        typeof item === 'object' &&
+        item !== null &&
+        'source' in item &&
+        typeof item.source === 'string'
+          ? item.source
+          : defaultSource;
+
+      if (valueText && valueText !== 'unknown') {
+        facts.push({
+          attribute: item.key,
+          value: valueText,
+          source,
+        });
+      }
+    }
+  }
+
+  return facts;
+}
+
+function extractFactsFromToolResults(toolsCalled: ToolCallRecord[]): ChatFact[] {
+  const facts: ChatFact[] = [];
+  const seen = new Set<string>();
+
+  for (const tool of toolsCalled) {
+    if (
+      tool.name !== 'get_property' &&
+      tool.name !== 'read_session_memory' &&
+      tool.name !== 'get_approved_answers'
+    ) {
+      continue;
+    }
+
+    try {
+      const parsed: unknown = JSON.parse(tool.result);
+      if (!isRecord(parsed) || !('attributes' in parsed)) {
+        continue;
+      }
+
+      const defaultSource =
+        tool.name === 'get_property'
+          ? 'listing_attribute'
+          : tool.name === 'get_approved_answers'
+            ? 'lister_answer'
+            : 'session_memory';
+
+      for (const fact of parseAttributeEntries(parsed.attributes, defaultSource)) {
+        const dedupeKey = `${fact.attribute}:${fact.value}`;
+        if (!seen.has(dedupeKey)) {
+          seen.add(dedupeKey);
+          facts.push(fact);
+        }
+      }
+    } catch {
+      logger.debug('Could not parse tool result for facts');
     }
   }
 
@@ -88,10 +131,15 @@ export class AgentLoop {
       'You are the Viewings AI assistant for a New Zealand property marketplace demo.',
       'Follow Understand, Verify, Answer, Act on every turn.',
       'Never invent property facts. Use tools for all factual claims.',
-      'If data is missing, say it is not specified and offer to ask the lister.',
+      'Fact lookup order (only call tools you need — do not preload everything):',
+      '1. Call get_property first for listing attributes.',
+      '2. If the requested attribute is missing, unknown, or insufficient, call read_session_memory.',
+      '3. If still not found, call get_approved_answers for the relevant attribute keys.',
+      'Do not call read_session_memory or get_approved_answers unless get_property did not answer the question.',
+      'If data is still missing after those steps, say it is not specified and offer to ask the lister.',
       buildListingTypeGuidance(listingType),
       'Timezone: Pacific/Auckland. Respond in English.',
-      'Do not claim a booking or lister message was sent unless the corresponding tool succeeded.',
+      'Do not claim a booking or lister message was sent unless the corresponding tool succeeded in this turn.',
       `Current property: ${propertyTitle} (${context.propertyId}).`,
       `Current session: ${context.sessionId}.`,
     ].join('\n');
@@ -180,7 +228,21 @@ export class AgentLoop {
     const facts = extractFactsFromToolResults(toolsCalled);
     const hasUnknown = detectUnknownIntent(finalContent);
     const answerStatus: AnswerStatus = deriveAnswerStatus(facts, hasUnknown);
-    const actions = pickActions(answerStatus, listingType);
+    const actions = pickActions(answerStatus, listingType).map((action) => {
+      if (action.type !== 'ask_lister') {
+        return action;
+      }
+
+      const payload: Record<string, string> = {
+        questionText: context.userMessage,
+      };
+
+      if (facts.length > 0) {
+        payload.canonicalAttributes = facts.map((fact) => fact.attribute).join(',');
+      }
+
+      return { ...action, payload };
+    });
 
     const toolNames = toolsCalled.map((tool) => tool.name);
     const primaryCta = actions[0]?.type ?? null;

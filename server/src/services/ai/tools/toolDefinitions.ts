@@ -141,7 +141,7 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'read_session_memory',
-      description: 'Read session context memory and approved answers',
+      description: 'Read session context memory and approved answers when get_property is insufficient',
       parameters: {
         type: 'object',
         properties: {
@@ -174,7 +174,7 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_approved_answers',
-      description: 'Fetch approved answers for a property',
+      description: 'Fetch approved lister answers when get_property and session memory are insufficient',
       parameters: {
         type: 'object',
         properties: {
