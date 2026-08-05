@@ -1,6 +1,7 @@
 import type { ListingType, Prisma } from '#generated/client.js';
 import prisma from '../../../../config/prisma.js';
-import { addDays } from '../../../../utils/helpers/date.js';
+import { addDays, atLocalTimeInTimezone } from '../../../../utils/helpers/date.js';
+import { TIMEZONE } from '../../../../utils/constants/pagination.js';
 
 interface AttributeSeed {
   key: string;
@@ -418,10 +419,8 @@ function attributeToJson(value: string | number | boolean | string[]): Prisma.In
 }
 
 function buildSlotTimes(base: Date, dayOffset: number, hour: number): { startsAt: Date; endsAt: Date } {
-  const startsAt = addDays(base, dayOffset);
-  startsAt.setUTCHours(hour, 0, 0, 0);
-  const endsAt = new Date(startsAt);
-  endsAt.setUTCMinutes(endsAt.getUTCMinutes() + 30);
+  const startsAt = atLocalTimeInTimezone(base, dayOffset, hour, 0, TIMEZONE);
+  const endsAt = new Date(startsAt.getTime() + 30 * 60 * 1000);
   return { startsAt, endsAt };
 }
 
@@ -492,29 +491,39 @@ export async function seedListings(listerId: string): Promise<void> {
       });
     }
 
-    const existingSlots = await prisma.availabilitySlot.count({
-      where: { propertyId: record.id, deletedAt: null },
+    // Refresh unbooked slots so wrong UTC-hour seeds are replaced with Auckland wall times.
+    // Leave booked slots (and any slot with a booking row) alone.
+    await prisma.availabilitySlot.deleteMany({
+      where: {
+        propertyId: record.id,
+        isBooked: false,
+        booking: { is: null },
+      },
     });
 
-    if (existingSlots === 0) {
-      const slotTemplates = [
-        buildSlotTimes(now, 2, 9),
-        buildSlotTimes(now, 3, 12),
-        buildSlotTimes(now, 4, 17),
-        buildSlotTimes(now, 6, 10),
-      ];
+    const remainingBooked = await prisma.availabilitySlot.count({
+      where: { propertyId: record.id, deletedAt: null, isBooked: true },
+    });
 
-      for (let index = 0; index < slotTemplates.length; index += 1) {
-        const template = slotTemplates[index];
-        await prisma.availabilitySlot.create({
-          data: {
-            propertyId: record.id,
-            startsAt: template.startsAt,
-            endsAt: template.endsAt,
-            isBooked: index === 0 && property.fixtureKey === 'wfh-outdoor',
-          },
-        });
-      }
+    const slotTemplates = [
+      buildSlotTimes(now, 2, 9),
+      buildSlotTimes(now, 3, 12),
+      buildSlotTimes(now, 4, 17),
+      buildSlotTimes(now, 6, 10),
+    ];
+
+    for (let index = 0; index < slotTemplates.length; index += 1) {
+      const template = slotTemplates[index];
+      await prisma.availabilitySlot.create({
+        data: {
+          propertyId: record.id,
+          startsAt: template.startsAt,
+          endsAt: template.endsAt,
+          timezone: TIMEZONE,
+          isBooked:
+            remainingBooked === 0 && index === 0 && property.fixtureKey === 'wfh-outdoor',
+        },
+      });
     }
   }
 }

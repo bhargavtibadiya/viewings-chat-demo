@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "outDir": "dist",
     "rootDir": "src",
     "baseUrl": ".",
@@ -22,9 +24,16 @@
     "declarationMap": true,
     "sourceMap": true,
     "paths": {
-      "#generated/client.js": ["./src/generated/client"]
+      "#generated/client.js": [
+        "./src/generated/client"
+      ]
     }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
