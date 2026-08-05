@@ -1,5 +1,6 @@
 import type OpenAI from 'openai';
 import type { AnswerStatus, ChatMessage, ListingType } from '#generated/client.js';
+import { env } from '../../config/env.js';
 import { getOpenAIClient, getOpenAIModel } from './openai.client.js';
 import { toolDefinitions } from './tools/toolDefinitions.js';
 import { toolHandlers } from './tools/toolHandlers.js';
@@ -123,7 +124,8 @@ export class AgentLoop {
         messages,
         tools: toolDefinitions,
         tool_choice: 'auto',
-      });
+        reasoning_effort: env.OPENAI_REASONING_EFFORT,
+      } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
 
       const choice = completion.choices[0]?.message;
       if (!choice) {

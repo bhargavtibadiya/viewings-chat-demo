@@ -20,8 +20,17 @@ export interface SafeChatMessage {
   createdAt: string;
 }
 
+export interface ChatMessagesPagination {
+  limit: number;
+  total: number;
+  hasMoreOlder: boolean;
+  oldestMessageId: string | null;
+  newestMessageId: string | null;
+}
+
 export interface ChatMessagesResponse {
   messages: SafeChatMessage[];
+  pagination: ChatMessagesPagination;
 }
 
 export interface ChatTurnResponse {
