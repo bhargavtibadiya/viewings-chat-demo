@@ -18,9 +18,10 @@ import {
   findSimilarOpenQuestion,
   formatOpenQuestionsForPrompt,
 } from './helpers/openListerQuestions.js';
+import { extractBookSlotActions } from './helpers/bookSlotActions.js';
 import { listerService } from '../../modules/lister/lister.service.js';
 import { AI } from '../../utils/constants/pagination.js';
-import type { AgentContext, AgentRunResult, ChatFact, ToolCallRecord } from './types/ai.types.js';
+import type { AgentContext, AgentRunResult, ChatAction, ChatFact, ToolCallRecord } from './types/ai.types.js';
 import { createLogger } from '../../utils/helpers/logger.js';
 import { isRecord } from '../../utils/helpers/json.js';
 
@@ -283,9 +284,12 @@ export class AgentLoop {
       'If send_question_to_lister returns alreadyAsked=true, tell the user you already asked and will share the answer when the lister responds. Do not claim you sent a new question. Do not invent an answer while waiting.',
       'Booking flow:',
       '- Always call get_availability before create_booking (including retries after a failed booking).',
-      '- Pass the exact slot_id from get_availability. Also pass slot_label with the user-chosen time.',
+      '- Never ask for the seeker\'s name or email. Contact details are taken from their account profile automatically.',
+      '- After get_availability, briefly introduce the times. The UI shows selectable slot buttons — do not dump a long numbered list of every slot. One short sentence plus 2–3 example times is enough.',
+      '- If the user clicks a slot button or names a time in text, book with create_booking using the exact slot_id (and slot_label when they typed a time).',
+      '- Pass the exact slot_id from get_availability. Also pass slot_label with the user-chosen time when booking from text.',
       '- Never invent slot ids. Never claim a slot is unavailable unless create_booking returned an error for that slot.',
-      '- If create_booking returns availableSlots, offer those times (with their ids) instead of guessing.',
+      '- If create_booking returns availableSlots, offer those times instead of guessing — the UI will show buttons again.',
       '- After a successful booking, give the confirmation and booking reference from the tool result. Direct the seeker to My bookings for details. Do not invent admin/lister approval steps.',
       buildListingTypeGuidance(listingType),
       'Timezone: Pacific/Auckland. Respond in English.',
@@ -424,8 +428,19 @@ export class AgentLoop {
       actions = actions.filter((action) => action.type !== 'ask_lister');
     }
 
+    const bookSlotActions = extractBookSlotActions(toolsCalled);
+    if (bookSlotActions.length > 0) {
+      actions = [
+        ...bookSlotActions,
+        ...actions.filter(
+          (action) => action.type !== 'view_available_times' && action.type !== 'confirm_booking',
+        ),
+      ];
+    }
+
     const toolNames = toolsCalled.map((tool) => tool.name);
-    const primaryCta = actions[0]?.type ?? null;
+    const primaryCta: string | null =
+      bookSlotActions[0]?.type ?? actions.find((action: ChatAction) => action.type !== 'book_slot')?.type ?? null;
 
     return {
       content: finalContent,
