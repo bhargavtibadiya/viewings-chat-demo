@@ -13,6 +13,7 @@ import { DemoPage } from '@/pages/DemoPage';
 import { useAppDispatch, useAppSelector } from '@/store/store';
 import { meThunk } from '@/store/auth/auth.thunk';
 import { useCommandPalette } from '@/hooks/use-command-palette';
+import { useSessionStatus } from '@/hooks/use-session-status';
 import { formatListingType } from '@/utils/helpers/propertyFormatters';
 import { getPropertiesThunk } from '@/store/properties/properties.thunk';
 
@@ -32,6 +33,7 @@ function AuthBootstrap(): null {
 function AuthenticatedLayout(): React.ReactElement {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const sessionStatus = useSessionStatus();
   const properties = useAppSelector((state) => state.properties.properties);
   const hasRequestedProperties = useAppSelector((state) => state.properties.hasRequestedProperties);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -39,9 +41,9 @@ function AuthenticatedLayout(): React.ReactElement {
   useCommandPalette(() => setSearchOpen((current) => !current), true);
 
   useEffect(() => {
-    if (hasRequestedProperties) return;
+    if (sessionStatus !== 'ready' || hasRequestedProperties) return;
     dispatch(getPropertiesThunk());
-  }, [dispatch, hasRequestedProperties]);
+  }, [dispatch, hasRequestedProperties, sessionStatus]);
 
   const commandItems = useMemo(
     () =>

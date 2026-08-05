@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Loader } from '@/components/ui';
 import { AppNavbar } from '@/components/layout/AppNavbar';
-import { useAppSelector } from '@/store/store';
+import { useSessionStatus } from '@/hooks/use-session-status';
 
 interface AppShellProps {
   onOpenSearch?: () => void;
@@ -9,13 +9,9 @@ interface AppShellProps {
 
 export function AppShell({ onOpenSearch }: AppShellProps): React.ReactElement {
   const location = useLocation();
-  const user = useAppSelector((state) => state.auth.user);
-  const meLoading = useAppSelector((state) => state.auth.meLoading);
-  const hasRequestedMe = useAppSelector((state) => state.auth.hasRequestedMe);
-  const token = useAppSelector((state) => state.auth.token);
-  const awaitingSessionRestore = token !== null && token.length > 0 && (!hasRequestedMe || meLoading);
+  const sessionStatus = useSessionStatus();
 
-  if (awaitingSessionRestore) {
+  if (sessionStatus === 'restoring') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg-base)]">
         <Loader size="lg" label="Checking session" />
@@ -23,7 +19,7 @@ export function AppShell({ onOpenSearch }: AppShellProps): React.ReactElement {
     );
   }
 
-  if (!user && !token) {
+  if (sessionStatus === 'unauthenticated') {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 

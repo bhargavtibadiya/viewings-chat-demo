@@ -1,4 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { logout } from '@/store/auth/auth.slice';
+import { loginThunk, meThunk } from '@/store/auth/auth.thunk';
 import {
   getAvailabilityThunk,
   getPropertiesThunk,
@@ -82,7 +84,12 @@ const propertiesSlice = createSlice({
         ...state,
         getAvailabilityLoading: false,
         availabilitySlots: [],
-      }));
+      }))
+      // A request made before the session was confirmed cannot be trusted, so every
+      // auth transition clears the cache and the "already requested" guard.
+      .addCase(loginThunk.fulfilled, () => initialState)
+      .addCase(meThunk.rejected, () => initialState)
+      .addCase(logout, () => initialState);
   },
 });
 
