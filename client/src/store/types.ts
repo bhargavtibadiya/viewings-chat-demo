@@ -72,6 +72,7 @@ export interface IAvailabilitySlot {
   endsAt: string;
   timezone: string;
   isBooked: boolean;
+  label?: string;
 }
 
 export interface IChatSession {
