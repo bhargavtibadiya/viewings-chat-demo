@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ChatMarkdown } from '@/components/chat/ChatMarkdown';
+import { ChatSlotPicker } from '@/components/chat/ChatSlotPicker';
 import { ChatThinkingBubble } from '@/components/chat/ChatThinkingBubble';
 import type { IChatMessage } from '@/store/types';
 import { cn } from '@/utils/helpers/cn';
@@ -11,6 +12,8 @@ interface ChatThreadProps {
   hasMoreOlder: boolean;
   loadingOlder: boolean;
   onLoadOlder: () => void;
+  bookingSlotId?: string | null;
+  onBookSlot?: (slotId: string, label: string) => void;
 }
 
 const SCROLL_TOP_THRESHOLD_PX = 80;
@@ -21,6 +24,8 @@ export function ChatThread({
   hasMoreOlder,
   loadingOlder,
   onLoadOlder,
+  bookingSlotId = null,
+  onBookSlot,
 }: ChatThreadProps): React.ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -56,7 +61,7 @@ export function ChatThread({
     if (shouldStickToBottomRef.current) {
       scrollToBottom('auto');
     }
-  }, [loadingOlder, messages, isThinking, scrollToBottom]);
+  }, [loadingOlder, messages, isThinking, bookingSlotId, scrollToBottom]);
 
   const handleScroll = (): void => {
     const container = scrollRef.current;
@@ -69,6 +74,11 @@ export function ChatThread({
       onLoadOlder();
     }
   };
+
+  const latestSlotMessageId = [...messages]
+    .reverse()
+    .find((message) => message.role === 'ASSISTANT' && message.actions?.some((action) => action.type === 'book_slot'))
+    ?.id;
 
   return (
     <div
@@ -97,7 +107,14 @@ export function ChatThread({
           </div>
         )}
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble
+            key={message.id}
+            message={message}
+            showSlotPicker={message.id === latestSlotMessageId}
+            bookingSlotId={bookingSlotId}
+            onBookSlot={onBookSlot}
+            slotsDisabled={isThinking || Boolean(bookingSlotId)}
+          />
         ))}
         {isThinking && <ChatThinkingBubble />}
       </div>
@@ -108,25 +125,51 @@ export function ChatThread({
 
 interface MessageBubbleProps {
   message: IChatMessage;
+  showSlotPicker: boolean;
+  bookingSlotId?: string | null;
+  onBookSlot?: (slotId: string, label: string) => void;
+  slotsDisabled: boolean;
 }
 
-function MessageBubble({ message }: MessageBubbleProps): React.ReactElement {
+function MessageBubble({
+  message,
+  showSlotPicker,
+  bookingSlotId,
+  onBookSlot,
+  slotsDisabled,
+}: MessageBubbleProps): React.ReactElement {
   const isUser = message.role === 'USER';
+  const hasSlots =
+    showSlotPicker &&
+    Boolean(onBookSlot) &&
+    Boolean(message.actions?.some((action) => action.type === 'book_slot'));
 
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-[88%] rounded-[var(--radius-sm)] px-3 py-2 text-[var(--text-sm)] leading-relaxed',
+          'rounded-[var(--radius-sm)] px-3 py-2 text-[var(--text-sm)] leading-relaxed',
           isUser
-            ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] [&_p]:text-[var(--color-text-inverse)]'
-            : 'border border-[var(--color-border-light)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)]',
+            ? 'max-w-[88%] bg-[var(--color-primary)] text-[var(--color-text-inverse)] [&_p]:text-[var(--color-text-inverse)]'
+            : hasSlots
+              ? 'w-full max-w-[min(100%,28rem)] border border-[var(--color-border-light)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)]'
+              : 'max-w-[88%] border border-[var(--color-border-light)] bg-[var(--color-bg-base)] text-[var(--color-text-primary)]',
         )}
       >
         {isUser ? (
           <p className="whitespace-pre-wrap text-[var(--color-text-inverse)]">{message.content}</p>
         ) : (
-          <ChatMarkdown content={message.content} />
+          <>
+            <ChatMarkdown content={message.content} />
+            {hasSlots && message.actions && onBookSlot && (
+              <ChatSlotPicker
+                actions={message.actions}
+                disabled={slotsDisabled}
+                bookingSlotId={bookingSlotId}
+                onBookSlot={onBookSlot}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

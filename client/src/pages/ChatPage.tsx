@@ -6,7 +6,12 @@ import { ChatLoadingSkeleton } from '@/components/chat/ChatLoadingSkeleton';
 import { ChatThread } from '@/components/chat/ChatThread';
 import { EvidencePicker, EvidenceSheet } from '@/components/chat/EvidenceSidebar';
 import { useAppDispatch, useAppSelector } from '@/store/store';
-import { getMessagesThunk, getSessionThunk, sendMessageThunk } from '@/store/chat/chat.thunk';
+import {
+  getMessagesThunk,
+  getSessionThunk,
+  sendMessageThunk,
+  bookSlotThunk,
+} from '@/store/chat/chat.thunk';
 import {
   clearChatState,
   hydrateMessagesFromCache,
@@ -35,8 +40,11 @@ export function ChatPage(): React.ReactElement {
   const lastTurn = useAppSelector((state) => state.chat.lastTurn);
   const sendLoading = useAppSelector((state) => state.chat.sendMessageLoading);
   const askListerLoading = useAppSelector((state) => state.chat.askListerLoading);
+  const bookSlotLoading = useAppSelector((state) => state.chat.bookSlotLoading);
+  const bookSlotId = useAppSelector((state) => state.chat.bookSlotId);
   const sendMessageError = useAppSelector((state) => state.chat.sendMessageError);
   const askListerError = useAppSelector((state) => state.chat.askListerError);
+  const bookSlotError = useAppSelector((state) => state.chat.bookSlotError);
   const user = useAppSelector((state) => state.auth.user);
   const sessionLoading = useAppSelector((state) => state.chat.getSessionLoading);
   const messagesLoading = useAppSelector((state) => state.chat.getMessagesLoading);
@@ -154,17 +162,32 @@ export function ChatPage(): React.ReactElement {
     );
   }, [dispatch, loadingOlder, messagesPagination?.oldestMessageId, session]);
 
+  const handleBookSlot = useCallback(
+    (slotId: string, label: string): void => {
+      if (!session || bookSlotLoading || sendLoading || askListerLoading) return;
+      void dispatch(
+        bookSlotThunk({
+          sessionId: session.id,
+          slotId,
+          label,
+        }),
+      );
+    },
+    [askListerLoading, bookSlotLoading, dispatch, sendLoading, session],
+  );
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     void handleSend(draft);
   };
 
   const isChatLoading = sessionLoading || messagesLoading;
+  const isBusy = sendLoading || askListerLoading || bookSlotLoading;
 
   const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      if (draft.trim().length > 0 && !sendLoading && !askListerLoading && !isChatLoading) {
+      if (draft.trim().length > 0 && !isBusy && !isChatLoading) {
         void handleSend(draft);
       }
     }
@@ -244,16 +267,18 @@ export function ChatPage(): React.ReactElement {
           ) : (
             <ChatThread
               messages={messages}
-              isThinking={sendLoading || askListerLoading}
+              isThinking={isBusy}
               hasMoreOlder={hasMoreOlder}
               loadingOlder={loadingOlder}
               onLoadOlder={handleLoadOlder}
+              bookingSlotId={bookSlotId}
+              onBookSlot={handleBookSlot}
             />
           )}
 
-          {(getSessionError || getMessagesError || sendMessageError || askListerError) && (
+          {(getSessionError || getMessagesError || sendMessageError || askListerError || bookSlotError) && (
             <div className="border-t border-[var(--color-border-light)] px-3 py-2 text-[var(--text-sm)] text-[var(--color-error)]">
-              {askListerError ?? sendMessageError ?? getMessagesError ?? getSessionError}
+              {bookSlotError ?? askListerError ?? sendMessageError ?? getMessagesError ?? getSessionError}
             </div>
           )}
 
@@ -281,7 +306,7 @@ export function ChatPage(): React.ReactElement {
               variant="primary"
               size="sm"
               iconOnly
-              disabled={draft.trim().length === 0 || sendLoading || askListerLoading || isChatLoading}
+              disabled={draft.trim().length === 0 || isBusy || isChatLoading}
               aria-label="Send message"
               className="mb-0.5 shrink-0"
             >
