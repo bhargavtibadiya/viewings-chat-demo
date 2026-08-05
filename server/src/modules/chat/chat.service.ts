@@ -10,7 +10,7 @@ import { createServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';
 import { AI } from '../../utils/constants/pagination.js';
 import { isRecord } from '../../utils/helpers/json.js';
-import type { PostMessageDtoType, GetMessagesQueryDtoType, AskListerDtoType } from './dto/chat.dto.js';
+import type { PostMessageDtoType, GetMessagesQueryDtoType, AskListerDtoType, BookSlotDtoType } from './dto/chat.dto.js';
 import type {
   ChatMessagesResponse,
   ChatTurnResponse,
@@ -27,9 +27,11 @@ import {
   toolCallsToJson,
 } from './helpers/chatJson.js';
 import { listerService } from '../lister/lister.service.js';
+import { bookingsService } from '../bookings/bookings.service.js';
 import type { ChatAction } from '../../services/ai/types/ai.types.js';
 import { enrichListerQuestion } from '../../services/ai/helpers/enrichListerQuestion.js';
 import { ALREADY_ASKED_LISTER_REPLY } from '../../services/ai/helpers/openListerQuestions.js';
+import { formatNzDateTime } from '../../utils/helpers/date.js';
 import { createLogger } from '../../utils/helpers/logger.js';
 
 const logger = createLogger('ChatService');
@@ -379,6 +381,115 @@ export class ChatService {
         intents: ['ask_lister'],
         attributes: dto.canonicalAttributes ?? [],
         tools: ['send_question_to_lister'],
+        cta: null,
+      },
+    };
+  }
+
+  async bookSlot(userId: string, sessionId: string, dto: BookSlotDtoType): Promise<ChatTurnResponse> {
+    const session = await this.verifySessionOwnership(userId, sessionId);
+
+    const slot = await prisma.availabilitySlot.findFirst({
+      where: {
+        id: dto.slotId,
+        propertyId: session.propertyId,
+        ...notDeleted(),
+      },
+    });
+
+    if (!slot) {
+      throw createServiceError(404, 'Slot not found for this property');
+    }
+
+    const slotLabel = formatNzDateTime(slot.startsAt);
+    const userMessage = await prisma.chatMessage.create({
+      data: {
+        sessionId,
+        role: 'USER',
+        content: `Book me in for ${slotLabel}`,
+      },
+    });
+
+    const result = await bookingsService.createBooking(userId, {
+      propertyId: session.propertyId,
+      slotId: dto.slotId,
+    });
+
+    const assistantMessage = await prisma.chatMessage.create({
+      data: {
+        sessionId,
+        role: 'ASSISTANT',
+        content: `${result.confirmationMessage}\n\nYou can review or cancel it anytime under **My bookings**.`,
+        answerStatus: 'VERIFIED',
+        metadata: {
+          booking: {
+            bookingId: result.booking.id,
+            slotId: result.booking.slotId,
+          },
+        },
+      },
+    });
+
+    // Clear stale slot buttons from earlier assistant messages in this session.
+    const priorWithActions = await prisma.chatMessage.findMany({
+      where: {
+        sessionId,
+        role: 'ASSISTANT',
+        id: { not: assistantMessage.id },
+        ...notDeleted(),
+      },
+      select: { id: true, actions: true },
+    });
+
+    for (const message of priorWithActions) {
+      const actions = parseActions(message.actions);
+      if (!actions?.some((action) => action.type === 'book_slot')) {
+        continue;
+      }
+      const remaining = actions.filter((action) => action.type !== 'book_slot');
+      await prisma.chatMessage.update({
+        where: { id: message.id },
+        data: {
+          actions: remaining.length > 0 ? chatActionsToJson(remaining) : [],
+        },
+      });
+    }
+
+    await prisma.turnLog.create({
+      data: {
+        sessionId,
+        userMessageId: userMessage.id,
+        assistantMessageId: assistantMessage.id,
+        intents: stringArrayToJson(['book_slot']),
+        attributes: stringArrayToJson([]),
+        entities: stringArrayToJson([]),
+        toolsCalled: toolCallsToJson([
+          {
+            name: 'create_booking',
+            arguments: { slot_id: dto.slotId },
+            result: JSON.stringify({
+              bookingId: result.booking.id,
+              confirmationMessage: result.confirmationMessage,
+            }),
+          },
+        ]),
+        sources: chatFactsToJson([]),
+        answerStatus: 'VERIFIED',
+        cta: optionalJsonObject(null),
+        rawModelTrace: rawTraceToJson([]),
+        latencyMs: 0,
+      },
+    });
+
+    return {
+      message: this.toSafeMessage(assistantMessage),
+      answer_status: 'VERIFIED',
+      facts: [],
+      actions: [],
+      debug: {
+        intents: ['book_slot'],
+        attributes: [],
+        tools: ['create_booking'],
         cta: null,
       },
     };
