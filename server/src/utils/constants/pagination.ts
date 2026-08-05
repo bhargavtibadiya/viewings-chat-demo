@@ -19,6 +19,10 @@ export const PAGINATION = {
   MAX_LIMIT: 100,
 } as const;
 
+export const CHAT_MESSAGES = {
+  DEFAULT_LIMIT: 20,
+} as const;
+
 export const AI = {
   MAX_TOOL_ITERATIONS: 6,
   MAX_RECENT_MESSAGES: 20,
