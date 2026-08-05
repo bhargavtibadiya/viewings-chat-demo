@@ -28,6 +28,10 @@ import {
 } from './helpers/chatJson.js';
 import { listerService } from '../lister/lister.service.js';
 import type { ChatAction } from '../../services/ai/types/ai.types.js';
+import { enrichListerQuestion } from '../../services/ai/helpers/enrichListerQuestion.js';
+import { createLogger } from '../../utils/helpers/logger.js';
+
+const logger = createLogger('ChatService');
 
 function parseActions(value: Prisma.JsonValue | null): ChatAction[] | null {
   if (!Array.isArray(value)) {
@@ -272,11 +276,33 @@ export class ChatService {
       throw createServiceError(404, 'Property not found');
     }
 
+    const recentForEnrichment = await prisma.chatMessage.findMany({
+      where: { sessionId, ...notDeleted() },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      select: { role: true, content: true },
+    });
+    recentForEnrichment.reverse();
+
+    const questionText = enrichListerQuestion(
+      dto.questionText,
+      recentForEnrichment.map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+    );
+
+    if (questionText !== dto.questionText.trim()) {
+      logger.info(
+        `askLister enriched bare question sessionId=${sessionId} from=${dto.questionText.slice(0, 80)} to=${questionText.slice(0, 160)}`,
+      );
+    }
+
     const userMessage = await prisma.chatMessage.create({
       data: {
         sessionId,
         role: 'USER',
-        content: dto.questionText,
+        content: questionText,
       },
     });
 
@@ -284,7 +310,7 @@ export class ChatService {
       propertyId: session.propertyId,
       sessionId,
       userId,
-      questionText: dto.questionText,
+      questionText,
       canonicalAttributes: dto.canonicalAttributes,
     });
 

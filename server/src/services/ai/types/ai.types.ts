@@ -57,6 +57,8 @@ export interface AgentContext {
   propertyId: string;
   userMessage: string;
   listingType: 'RENTAL' | 'SALE';
+  /** Recent thread messages for ask-lister question enrichment (optional). */
+  recentMessages?: Array<{ role: string; content: string }>;
 }
 
 export interface AgentRunResult {

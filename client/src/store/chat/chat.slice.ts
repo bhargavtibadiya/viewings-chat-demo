@@ -25,7 +25,7 @@ const initialState: ChatSliceInterface = {
   askListerLoading: false,
   askListerError: null,
   lastTurn: null,
-  showDebugStrip: true,
+  showDebugStrip: false,
 };
 
 function isPendingUserMessage(message: IChatMessage): boolean {
