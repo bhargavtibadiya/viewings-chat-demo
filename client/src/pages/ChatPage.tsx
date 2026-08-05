@@ -1,22 +1,20 @@
 import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, FlaskConical, PanelRightOpen, Send } from 'lucide-react';
+import { ArrowLeft, PanelRightOpen, Send } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
 import { ChatLoadingSkeleton } from '@/components/chat/ChatLoadingSkeleton';
 import { ChatThread } from '@/components/chat/ChatThread';
 import { EvidencePicker, EvidenceSheet } from '@/components/chat/EvidenceSidebar';
 import { useAppDispatch, useAppSelector } from '@/store/store';
-import { getMessagesThunk, getSessionThunk, sendMessageThunk, askListerThunk } from '@/store/chat/chat.thunk';
+import { getMessagesThunk, getSessionThunk, sendMessageThunk } from '@/store/chat/chat.thunk';
 import {
   clearChatState,
   hydrateMessagesFromCache,
-  toggleDebugStrip,
 } from '@/store/chat/chat.slice';
 import { getPropertiesThunk } from '@/store/properties/properties.thunk';
 import { getPropertyByIdThunk } from '@/store/properties/properties.thunk';
 import { findPropertyByFixtureKey, formatListingPrice, formatListingType } from '@/utils/helpers/propertyFormatters';
 import type { EvidencePrompt } from '@/utils/helpers/evidencePrompts';
-import type { IChatAction } from '@/store/types';
 import { setActiveSessionId } from '@/store/demo/demo.slice';
 import {
   CHAT_MESSAGES_DEFAULT_LIMIT,
@@ -29,6 +27,7 @@ export function ChatPage(): React.ReactElement {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const pendingHandledRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const session = useAppSelector((state) => state.chat.session);
   const messages = useAppSelector((state) => state.chat.messages);
   const messagesPagination = useAppSelector((state) => state.chat.messagesPagination);
@@ -126,46 +125,13 @@ export function ChatPage(): React.ReactElement {
     async (content: string): Promise<void> => {
       if (!session || content.trim().length === 0) return;
       setDraft('');
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
       await dispatch(sendMessageThunk({ sessionId: session.id, content: content.trim() }));
+      textareaRef.current?.focus();
     },
     [dispatch, session],
-  );
-
-  const handleAskLister = useCallback(
-    async (action: IChatAction): Promise<void> => {
-      if (!session) return;
-
-      const payloadQuestion =
-        typeof action.payload?.questionText === 'string' ? action.payload.questionText : undefined;
-      const lastUserMessage = [...messages].reverse().find((message) => message.role === 'USER');
-      const questionText = payloadQuestion ?? lastUserMessage?.content ?? action.label;
-
-      const attributesRaw = action.payload?.canonicalAttributes;
-      const canonicalAttributes =
-        typeof attributesRaw === 'string'
-          ? attributesRaw.split(',').map((item) => item.trim()).filter((item) => item.length > 0)
-          : undefined;
-
-      await dispatch(
-        askListerThunk({
-          sessionId: session.id,
-          questionText,
-          canonicalAttributes,
-        }),
-      );
-    },
-    [dispatch, messages, session],
-  );
-
-  const handleAction = useCallback(
-    async (action: IChatAction): Promise<void> => {
-      if (action.type === 'ask_lister') {
-        await handleAskLister(action);
-        return;
-      }
-      await handleSend(action.label);
-    },
-    [handleAskLister, handleSend],
   );
 
   const handleLoadOlder = useCallback(() => {
@@ -184,6 +150,8 @@ export function ChatPage(): React.ReactElement {
     event.preventDefault();
     void handleSend(draft);
   };
+
+  const isChatLoading = sessionLoading || messagesLoading;
 
   const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -220,8 +188,6 @@ export function ChatPage(): React.ReactElement {
     navigate(location.pathname, { replace: true, state: null });
   }, [handleSend, location.pathname, location.state, navigate, sendLoading, session]);
 
-  const actionButtons = lastTurn?.actions ?? [];
-  const isChatLoading = sessionLoading || messagesLoading;
   const hasMoreOlder = messagesPagination?.hasMoreOlder ?? false;
 
   return (
@@ -261,15 +227,6 @@ export function ChatPage(): React.ReactElement {
           >
             <PanelRightOpen className="h-3.5 w-3.5" strokeWidth={1.5} />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={() => dispatch(toggleDebugStrip())}
-            aria-label="Toggle debug"
-          >
-            <FlaskConical className="h-3.5 w-3.5" strokeWidth={1.5} />
-          </Button>
         </div>
       </div>
 
@@ -297,30 +254,18 @@ export function ChatPage(): React.ReactElement {
             </div>
           )}
 
-          {actionButtons.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 border-t border-[var(--color-border-light)] px-3 py-2">
-              {actionButtons.map((action) => (
-                <ChatActionButton
-                  key={`${action.type}-${action.label}`}
-                  action={action}
-                  disabled={sendLoading || askListerLoading}
-                  onAction={handleAction}
-                />
-              ))}
-            </div>
-          )}
-
           <form
             className="flex items-center gap-2 border-t border-[var(--color-border-light)] bg-[var(--color-bg-base)] px-3 py-2.5"
             onSubmit={handleSubmit}
           >
             <textarea
+              ref={textareaRef}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleDraftKeyDown}
               placeholder="Ask about this listing…"
               rows={1}
-              disabled={isChatLoading || sendLoading}
+              disabled={isChatLoading}
               className="min-h-[36px] max-h-24 flex-1 resize-none rounded-[var(--radius-sm)] border-[1.5px] border-[var(--color-border-medium)] bg-[var(--color-bg-surface)] px-3 py-2 text-[var(--text-sm)] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:shadow-[var(--shadow-input-focus)]"
             />
             <Button
@@ -358,27 +303,6 @@ export function ChatPage(): React.ReactElement {
 
       <EvidenceSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onSelectPrompt={handlePromptSelect} />
     </div>
-  );
-}
-
-interface ChatActionButtonProps {
-  action: IChatAction;
-  disabled?: boolean;
-  onAction: (action: IChatAction) => Promise<void>;
-}
-
-function ChatActionButton({ action, disabled = false, onAction }: ChatActionButtonProps): React.ReactElement {
-  return (
-    <Button
-      variant="secondary"
-      size="sm"
-      disabled={disabled}
-      onClick={() => {
-        void onAction(action);
-      }}
-    >
-      {action.label}
-    </Button>
   );
 }
 
