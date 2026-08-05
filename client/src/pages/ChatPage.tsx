@@ -1,0 +1,262 @@
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, FlaskConical, PanelRightOpen, Send } from 'lucide-react';
+import { Badge, Button, Loader } from '@/components/ui';
+import { ChatThread } from '@/components/chat/ChatThread';
+import { EvidencePicker, EvidenceSheet } from '@/components/chat/EvidenceSidebar';
+import { useAppDispatch, useAppSelector } from '@/store/store';
+import { getMessagesThunk, getSessionThunk, sendMessageThunk } from '@/store/chat/chat.thunk';
+import { clearChatState, toggleDebugStrip } from '@/store/chat/chat.slice';
+import { getPropertiesThunk } from '@/store/properties/properties.thunk';
+import { getPropertyByIdThunk } from '@/store/properties/properties.thunk';
+import { findPropertyByFixtureKey, formatListingPrice, formatListingType } from '@/utils/helpers/propertyFormatters';
+import type { EvidencePrompt } from '@/utils/helpers/evidencePrompts';
+import type { IChatAction } from '@/store/types';
+import { setActiveSessionId } from '@/store/demo/demo.slice';
+
+export function ChatPage(): React.ReactElement {
+  const { propertyId = '' } = useParams();
+  const location = useLocation();
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const pendingHandledRef = useRef(false);
+  const session = useAppSelector((state) => state.chat.session);
+  const messages = useAppSelector((state) => state.chat.messages);
+  const lastTurn = useAppSelector((state) => state.chat.lastTurn);
+  const sendLoading = useAppSelector((state) => state.chat.sendMessageLoading);
+  const sessionLoading = useAppSelector((state) => state.chat.getSessionLoading);
+  const messagesLoading = useAppSelector((state) => state.chat.getMessagesLoading);
+  const hasRequestedMessages = useAppSelector((state) => state.chat.hasRequestedMessages);
+  const showDebugStrip = useAppSelector((state) => state.chat.showDebugStrip);
+  const property = useAppSelector((state) => state.properties.property);
+  const properties = useAppSelector((state) => state.properties.properties);
+  const [draft, setDraft] = useState('');
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  useEffect(() => {
+    if (propertyId.length === 0) return undefined;
+    dispatch(clearChatState());
+    dispatch(getPropertyByIdThunk({ propertyId }));
+    dispatch(getSessionThunk({ propertyId }));
+    if (properties.length === 0) {
+      dispatch(getPropertiesThunk());
+    }
+    return () => {
+      dispatch(clearChatState());
+    };
+  }, [dispatch, propertyId, properties.length]);
+
+  useEffect(() => {
+    if (!session) return;
+    if (hasRequestedMessages || messagesLoading) return;
+    dispatch(getMessagesThunk({ sessionId: session.id }));
+    dispatch(setActiveSessionId(session.id));
+  }, [dispatch, hasRequestedMessages, messagesLoading, session]);
+
+  const handleSend = useCallback(
+    async (content: string): Promise<void> => {
+      if (!session || content.trim().length === 0) return;
+      setDraft('');
+      await dispatch(sendMessageThunk({ sessionId: session.id, content: content.trim() }));
+    },
+    [dispatch, session],
+  );
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    void handleSend(draft);
+  };
+
+  const handlePromptSelect = (prompt: EvidencePrompt): void => {
+    const targetProperty = findPropertyByFixtureKey(properties, prompt.fixtureKey);
+    if (targetProperty && targetProperty.id !== propertyId) {
+      navigate(`/chat/${targetProperty.id}`, {
+        state: { pendingMessage: prompt.message },
+      });
+      return;
+    }
+    void handleSend(prompt.message);
+  };
+
+  useEffect(() => {
+    pendingHandledRef.current = false;
+  }, [propertyId]);
+
+  useEffect(() => {
+    if (!session || sendLoading || pendingHandledRef.current) return;
+
+    const pendingMessage = getPendingMessage(location.state);
+    if (!pendingMessage) return;
+
+    pendingHandledRef.current = true;
+    void handleSend(pendingMessage);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [handleSend, location.pathname, location.state, navigate, sendLoading, session]);
+
+  const actionButtons = lastTurn?.actions ?? [];
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-light)] pb-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Link
+            to={property ? `/properties/${property.id}` : '/'}
+            aria-label="Back to property"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border-light)] bg-[var(--color-bg-surface)] text-[var(--color-text-secondary)] no-underline transition-colors hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-primary)] hover:no-underline"
+          >
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+          </Link>
+          {property && (
+            <h1 className="page-title-lg truncate">{property.title}</h1>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {property && (
+            <>
+              <Badge variant="ghost" status="neutral" size="xs">
+                {formatListingType(property.listingType)}
+              </Badge>
+              <span className="text-[var(--text-md)] font-bold text-[var(--color-primary)]">
+                {formatListingPrice(property)}
+              </span>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            className="lg:hidden"
+            onClick={() => setSheetOpen(true)}
+            aria-label="Try evidence prompt"
+          >
+            <PanelRightOpen className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={() => dispatch(toggleDebugStrip())}
+            aria-label="Toggle debug"
+          >
+            <FlaskConical className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div
+          className="flex min-h-[min(520px,calc(100vh-11rem))] max-h-[min(640px,calc(100vh-9rem))] flex-col overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border-light)] bg-[var(--color-bg-surface)] shadow-[var(--shadow-card)]"
+        >
+          {(sessionLoading || messagesLoading) && (
+            <div className="border-b border-[var(--color-border-light)] px-3 py-2">
+              <Loader label="Loading chat" size="sm" />
+            </div>
+          )}
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+            <ChatThread messages={messages} sendLoading={sendLoading} />
+          </div>
+
+          {actionButtons.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 border-t border-[var(--color-border-light)] px-3 py-2">
+              {actionButtons.map((action) => (
+                <ChatActionButton key={`${action.type}-${action.label}`} action={action} onSend={handleSend} />
+              ))}
+            </div>
+          )}
+
+          <form
+            className="flex items-end gap-2 border-t border-[var(--color-border-light)] bg-[var(--color-bg-base)] px-3 py-2.5"
+            onSubmit={handleSubmit}
+          >
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Ask about this listing…"
+              rows={1}
+              className="min-h-[36px] max-h-24 flex-1 resize-none rounded-[var(--radius-sm)] border-[1.5px] border-[var(--color-border-medium)] bg-[var(--color-bg-surface)] px-3 py-2 text-[var(--text-sm)] text-[var(--color-text-primary)] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:shadow-[var(--shadow-input-focus)]"
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              iconOnly
+              loading={sendLoading}
+              disabled={draft.trim().length === 0}
+              aria-label="Send message"
+            >
+              <Send className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </Button>
+          </form>
+        </div>
+
+        <aside className="hidden lg:block">
+          <div className="rounded-[var(--radius-sm)] border border-[var(--color-border-light)] bg-[var(--color-bg-surface)] p-3 shadow-[var(--shadow-card)]">
+            <EvidencePicker onSelectPrompt={handlePromptSelect} />
+          </div>
+        </aside>
+      </div>
+
+      {showDebugStrip && lastTurn && (
+        <div className="rounded-[var(--radius-sm)] border border-[var(--color-border-light)] bg-[var(--color-bg-surface)] p-3">
+          <p className="section-label !mb-2 !pb-2">Debug</p>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <DebugBlock title="Answer status" value={lastTurn.answer_status} />
+            <DebugBlock title="Intents" value={lastTurn.debug.intents.join(', ') || 'None'} />
+            <DebugBlock title="Attributes" value={lastTurn.debug.attributes.join(', ') || 'None'} />
+            <DebugBlock title="Tools" value={lastTurn.debug.tools.join(', ') || 'None'} />
+          </div>
+        </div>
+      )}
+
+      <EvidenceSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onSelectPrompt={handlePromptSelect} />
+    </div>
+  );
+}
+
+interface ChatActionButtonProps {
+  action: IChatAction;
+  onSend: (message: string) => Promise<void>;
+}
+
+function ChatActionButton({ action, onSend }: ChatActionButtonProps): React.ReactElement {
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => {
+        void onSend(action.label);
+      }}
+    >
+      {action.label}
+    </Button>
+  );
+}
+
+interface DebugBlockProps {
+  title: string;
+  value: string;
+}
+
+function DebugBlock({ title, value }: DebugBlockProps): React.ReactElement {
+  return (
+    <div className="rounded-[var(--radius-sm)] bg-[var(--color-bg-secondary)] px-2.5 py-2">
+      <p className="text-[var(--text-2xs)] font-bold uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
+        {title}
+      </p>
+      <p className="mt-0.5 text-[var(--text-sm)] text-[var(--color-text-primary)]">{value}</p>
+    </div>
+  );
+}
+
+function getPendingMessage(state: unknown): string | null {
+  if (typeof state !== 'object' || state === null || !('pendingMessage' in state)) {
+    return null;
+  }
+  const pendingMessage = state.pendingMessage;
+  if (typeof pendingMessage !== 'string' || pendingMessage.length === 0) {
+    return null;
+  }
+  return pendingMessage;
+}
