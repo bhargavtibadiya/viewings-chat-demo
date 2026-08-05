@@ -12,20 +12,27 @@ import type {
   ISendMessageThunkPayload,
   ISendMessageThunkResponse,
 } from '@/store/chat/chat.types';
+import { getMessagesFetchKey } from '@/store/chat/chat.types';
 
 export const getSessionThunk = createAsyncThunk<
   IGetSessionThunkResponse,
   IGetSessionThunkPayload,
   { rejectValue: ApiErrorData; state: RootState }
->('chat/getSession', async (data, { rejectWithValue }) => {
-  try {
-    const response = await chatService.getSession(data);
-    return response.data;
-  } catch (error: unknown) {
-    const fallback = getErrorMessage(error, 'Failed to open chat session');
-    return rejectWithValue({ data: extractApiError(error, fallback) });
-  }
-});
+>(
+  'chat/getSession',
+  async (data, { rejectWithValue }) => {
+    try {
+      const response = await chatService.getSession(data);
+      return response.data;
+    } catch (error: unknown) {
+      const fallback = getErrorMessage(error, 'Failed to open chat session');
+      return rejectWithValue({ data: extractApiError(error, fallback) });
+    }
+  },
+  {
+    condition: (_, { getState }) => !getState().chat.getSessionLoading,
+  },
+);
 
 export const getMessagesThunk = createAsyncThunk<
   IGetMessagesThunkResponse,
@@ -43,7 +50,24 @@ export const getMessagesThunk = createAsyncThunk<
     }
   },
   {
-    condition: (_, { getState }) => !getState().chat.getMessagesLoading,
+    condition: (arg, { getState }) => {
+      const state = getState().chat;
+      const fetchKey = getMessagesFetchKey(arg.before);
+      const cached = state.sessionMessagesCache[arg.sessionId];
+
+      if (cached?.fetchedKeys.includes(fetchKey)) {
+        return false;
+      }
+
+      if (arg.before) {
+        if (state.getOlderMessagesLoading) return false;
+        if (!state.messagesPagination?.hasMoreOlder) return false;
+      } else if (state.getMessagesLoading) {
+        return false;
+      }
+
+      return true;
+    },
   },
 );
 
