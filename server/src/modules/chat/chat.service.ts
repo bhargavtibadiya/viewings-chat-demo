@@ -5,8 +5,9 @@ import {
   emptySessionMemory,
   parseSessionMemory,
   sessionMemoryToJson,
+  setActiveBookingPref,
 } from '../../services/ai/tools/sessionMemory.js';
-import { createServiceError } from '../../utils/helpers/serviceError.js';
+import { createServiceError, ServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';
 import { AI } from '../../utils/constants/pagination.js';
 import { isRecord } from '../../utils/helpers/json.js';
@@ -31,8 +32,10 @@ import { bookingsService } from '../bookings/bookings.service.js';
 import type { ChatAction } from '../../services/ai/types/ai.types.js';
 import { enrichListerQuestion } from '../../services/ai/helpers/enrichListerQuestion.js';
 import { ALREADY_ASKED_LISTER_REPLY } from '../../services/ai/helpers/openListerQuestions.js';
+import { API_FAILURE_ACK } from '../../services/ai/policies/scopeGuard.js';
 import { formatNzDateTime } from '../../utils/helpers/date.js';
 import { createLogger } from '../../utils/helpers/logger.js';
+import { propertiesService } from '../properties/properties.service.js';
 
 const logger = createLogger('ChatService');
 
@@ -221,18 +224,45 @@ export class ChatService {
 
     recentMessages.reverse();
 
-    const agentResult = await agentLoop.run(
-      {
-        sessionId,
-        userId,
-        propertyId: session.propertyId,
-        userMessage: dto.content,
-        listingType: property.listingType,
-      },
-      recentMessages.filter((message) => message.id !== userMessage.id),
-      property.listingType,
-      property.title,
-    );
+    let agentResult;
+    try {
+      agentResult = await agentLoop.run(
+        {
+          sessionId,
+          userId,
+          propertyId: session.propertyId,
+          userMessage: dto.content,
+          listingType: property.listingType,
+        },
+        recentMessages.filter((message) => message.id !== userMessage.id),
+        property.listingType,
+        property.title,
+        {
+          rentWeekly: property.rentWeekly,
+          bond: property.bond,
+          price: property.price,
+          bedrooms: property.bedrooms,
+          bathrooms: property.bathrooms,
+        },
+      );
+    } catch (error) {
+      logger.error(`postMessage agent failure sessionId=${sessionId}`, error);
+      agentResult = {
+        content: API_FAILURE_ACK,
+        answerStatus: 'UNKNOWN' as const,
+        facts: [],
+        actions: [],
+        debug: {
+          intents: ['api_failure'],
+          attributes: [],
+          tools: [],
+          cta: null,
+        },
+        toolsCalled: [],
+        rawTrace: [{ error: 'agent_loop_failed' }],
+        latencyMs: 0,
+      };
+    }
 
     const assistantMessage = await prisma.chatMessage.create({
       data: {
@@ -410,9 +440,78 @@ export class ChatService {
       },
     });
 
-    const result = await bookingsService.createBooking(userId, {
-      propertyId: session.propertyId,
-      slotId: dto.slotId,
+    let result;
+    try {
+      result = await bookingsService.createBooking(userId, {
+        propertyId: session.propertyId,
+        slotId: dto.slotId,
+      });
+    } catch (error) {
+      const message =
+        error instanceof ServiceError
+          ? error.message
+          : 'Sorry, that booking could not be completed. Please try another time.';
+
+      let availableHint = '';
+      try {
+        const availability = await propertiesService.getAvailability(session.propertyId, {});
+        if (availability.slots.length > 0) {
+          availableHint =
+            '\n\nHere are some other times you can try — pick a slot below or ask me for another date.';
+        } else {
+          availableHint =
+            '\n\nThere are no free viewing times right now. Ask me to check another date.';
+        }
+      } catch {
+        // ignore availability lookup failure
+      }
+
+      const assistantMessage = await prisma.chatMessage.create({
+        data: {
+          sessionId,
+          role: 'ASSISTANT',
+          content: `${message}${availableHint}`,
+          answerStatus: 'UNKNOWN',
+        },
+      });
+
+      logger.warn(
+        `bookSlot failed sessionId=${sessionId} slotId=${dto.slotId}: ${message}`,
+      );
+
+      return {
+        message: this.toSafeMessage(assistantMessage),
+        answer_status: 'UNKNOWN',
+        facts: [],
+        actions: [],
+        debug: {
+          intents: ['book_slot_failed'],
+          attributes: [],
+          tools: ['create_booking'],
+          cta: null,
+        },
+      };
+    }
+
+    const sessionMemory = parseSessionMemory(
+      (
+        await prisma.chatSession.findFirst({
+          where: { id: sessionId },
+          select: { contextMemory: true },
+        })
+      )?.contextMemory ?? {},
+    );
+    await prisma.chatSession.update({
+      where: { id: sessionId },
+      data: {
+        contextMemory: sessionMemoryToJson(
+          setActiveBookingPref(sessionMemory, {
+            bookingId: result.booking.id,
+            slotLabel,
+            startsAt: slot.startsAt.toISOString(),
+          }),
+        ),
+      },
     });
 
     const assistantMessage = await prisma.chatMessage.create({
