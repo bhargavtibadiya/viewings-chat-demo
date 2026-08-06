@@ -7,6 +7,12 @@ interface AppShellProps {
   onOpenSearch?: () => void;
 }
 
+/**
+ * Guards authenticated routes and renders the shared application chrome.
+ *
+ * @param props - Optional handler for the global listing search
+ * @returns A session gate, redirect, or authenticated route outlet
+ */
 export function AppShell({ onOpenSearch }: AppShellProps): React.ReactElement {
   const location = useLocation();
   const sessionStatus = useSessionStatus();

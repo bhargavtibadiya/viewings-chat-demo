@@ -6,12 +6,19 @@ interface AuthLayoutProps {
   children: React.ReactNode;
 }
 
+/**
+ * Shows authentication content and redirects an existing session to its destination.
+ *
+ * @param props - Authentication page content
+ * @returns The auth layout or an authenticated-user redirect
+ */
 export function AuthLayout({ children }: AuthLayoutProps): React.ReactElement {
   const location = useLocation();
   const user = useAppSelector((state) => state.auth.user);
   const token = useAppSelector((state) => state.auth.token);
 
   if (user && token) {
+    // [SEC] only accepts a string path from router state to avoid rendering an invalid redirect target.
     const redirectPath =
       typeof location.state === 'object' &&
       location.state !== null &&

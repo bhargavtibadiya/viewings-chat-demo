@@ -8,6 +8,12 @@ interface AppNavbarProps {
   onOpenSearch?: () => void;
 }
 
+/**
+ * Renders responsive navigation and an optional listing-search trigger.
+ *
+ * @param props - Optional handler for opening search
+ * @returns The global application navigation bar
+ */
 export function AppNavbar({ onOpenSearch }: AppNavbarProps): React.ReactElement {
   return (
     <header className="sticky top-0 z-[var(--z-sticky)] border-b border-[var(--color-border-light)] bg-[var(--color-bg-base)]">
