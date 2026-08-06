@@ -3,8 +3,9 @@ import { useAppSelector } from '@/store/store';
 export type SessionStatus = 'restoring' | 'unauthenticated' | 'ready';
 
 /**
- * Single source of truth for whether authenticated data requests may run yet.
- * A persisted token is only trustworthy once `me` has confirmed it.
+ * Determines whether authenticated application data may be requested.
+ *
+ * @returns The current session restoration, unauthenticated, or ready status
  */
 export function useSessionStatus(): SessionStatus {
   const user = useAppSelector((state) => state.auth.user);
@@ -12,6 +13,7 @@ export function useSessionStatus(): SessionStatus {
   const meLoading = useAppSelector((state) => state.auth.meLoading);
   const hasRequestedMe = useAppSelector((state) => state.auth.hasRequestedMe);
 
+  // [SEC] A persisted token is not trusted until the profile request validates it.
   const hasToken = token !== null && token.length > 0;
 
   if (hasToken && (!hasRequestedMe || meLoading)) {
