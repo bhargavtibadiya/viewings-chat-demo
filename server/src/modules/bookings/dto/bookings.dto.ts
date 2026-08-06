@@ -11,7 +11,7 @@ export const CreateBookingDto = z.object({
 
 export type CreateBookingDtoType = z.infer<typeof CreateBookingDto>;
 
-/** Resolved booking input after filling contact from the authenticated user profile. */
+// [NOTE] This input includes contact details resolved from the authenticated user when omitted.
 export type ResolvedCreateBookingDto = CreateBookingDtoType & {
   contactName: string;
   contactEmail: string;

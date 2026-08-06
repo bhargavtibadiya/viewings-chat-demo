@@ -5,44 +5,28 @@ import { ROUTES } from '../../utils/constants/routes.js';
 
 const router = Router();
 
-/**
- * @route   POST /api/bookings
- * @desc    Create a booking
- * @access  Protected
- */
+// [NOTE] Create a booking
 router.post(
   ROUTES.BOOKINGS.CREATE,
   authenticate,
   bookingsController.createBooking,
 );
 
-/**
- * @route   GET /api/bookings
- * @desc    List current user bookings
- * @access  Protected
- */
+// [NOTE] List current user bookings
 router.get(
   ROUTES.BOOKINGS.LIST,
   authenticate,
   bookingsController.listBookings,
 );
 
-/**
- * @route   GET /api/bookings/:bookingId
- * @desc    Get booking detail
- * @access  Protected
- */
+// [NOTE] Get booking detail
 router.get(
   ROUTES.BOOKINGS.GET_BY_ID,
   authenticate,
   bookingsController.getBookingById,
 );
 
-/**
- * @route   POST /api/bookings/:bookingId/cancel
- * @desc    Cancel a booking
- * @access  Protected
- */
+// [NOTE] Cancel a booking
 router.post(
   ROUTES.BOOKINGS.CANCEL,
   authenticate,

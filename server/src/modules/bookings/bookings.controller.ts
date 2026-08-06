@@ -19,6 +19,14 @@ export class BookingsController {
     this.bookingsService = new BookingsService();
   }
 
+  /**
+   * Creates a viewing booking for the authenticated user.
+   *
+   * @param req - Authenticated Express request containing booking details
+   * @param res - Express response used to return the booking
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   createBooking = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dtoResult = CreateBookingDto.safeParse(req.body);
@@ -46,6 +54,14 @@ export class BookingsController {
     }
   };
 
+  /**
+   * Lists bookings owned by the authenticated user.
+   *
+   * @param req - Authenticated Express request
+   * @param res - Express response used to return bookings
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   listBookings = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -60,6 +76,14 @@ export class BookingsController {
     }
   };
 
+  /**
+   * Returns one booking owned by the authenticated user.
+   *
+   * @param req - Authenticated Express request containing the booking ID
+   * @param res - Express response used to return the booking
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   getBookingById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -80,6 +104,14 @@ export class BookingsController {
     }
   };
 
+  /**
+   * Cancels one booking owned by the authenticated user.
+   *
+   * @param req - Authenticated Express request containing the booking ID
+   * @param res - Express response used to return the cancelled booking
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   cancelBooking = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
