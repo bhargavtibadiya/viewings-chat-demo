@@ -27,6 +27,11 @@ interface RoutePattern {
   priority: number;
 }
 
+// ============================================================================
+// ROUTE_PATTERNS
+// Deterministic regex routes ordered by priority for known LLM failure modes
+// ============================================================================
+
 const ROUTE_PATTERNS: RoutePattern[] = [
   {
     id: 'furnishing_bed',
@@ -171,9 +176,17 @@ const ROUTE_PATTERNS: RoutePattern[] = [
   },
 ];
 
+// ============================================================================
+// EXPORTED FUNCTIONS
+// Resolve the best route for a user message and format it for the system prompt
+// ============================================================================
+
 /**
  * Resolve the best-matching canonical intent route for a user message.
  * Returns null when no specialised pattern matches (LLM handles with general rules).
+ *
+ * @param userMessage - Raw seeker message for this turn
+ * @returns Best CanonicalIntentRoute, or null when no pattern matches
  */
 export function resolveCanonicalIntent(userMessage: string): CanonicalIntentRoute | null {
   const trimmed = userMessage.trim();
@@ -181,7 +194,6 @@ export function resolveCanonicalIntent(userMessage: string): CanonicalIntentRout
     return null;
   }
 
-  // Prefer "stay warm" heating over generic cooling if both could fire.
   const matches: Array<RoutePattern & { score: number }> = [];
 
   for (const route of ROUTE_PATTERNS) {
@@ -194,18 +206,18 @@ export function resolveCanonicalIntent(userMessage: string): CanonicalIntentRout
     return null;
   }
 
-  // Special case: "stay warm" should not also pick cooling.
+  // [WHY] "stay warm" / freeze / heat must not also pick cooling when cooling words are absent
   const heatingHit = matches.find((match) => match.id === 'heating_warm');
   const coolingHit = matches.find((match) => match.id === 'cooling_hot');
   if (heatingHit && coolingHit && /\bwarm\b|\bfreeze\b|\bheat/i.test(trimmed) && !/\bcool|\bac\b|air[\s-]?cond|hot\b/i.test(trimmed)) {
     matches.splice(matches.indexOf(coolingHit), 1);
   }
 
-  // Special case: "buy a bed" must beat any bedroom noun routing (prompt-level).
+  // [WHY] priority sort — furnishing_bed (100) must beat generic bedroom noun routing
   matches.sort((a, b) => b.score - a.score);
   const best = matches[0]!;
 
-  // Merge attributes when dog-outdoor and sale-pets both match → keep dog-outdoor attrs.
+  // [WHY] merge near-priority attrs (e.g. dog-outdoor + sale-pets) without demoting the winner
   const mergedAttributes = [...best.attributes];
   for (const match of matches.slice(1)) {
     if (match.priority >= best.priority - 15) {
@@ -226,7 +238,12 @@ export function resolveCanonicalIntent(userMessage: string): CanonicalIntentRout
   };
 }
 
-/** Prompt block injected when a specialised route matches. */
+/**
+ * Prompt block injected when a specialised route matches.
+ *
+ * @param route - Resolved canonical intent route
+ * @returns Multiline INTENT ROUTING block for the system prompt
+ */
 export function formatIntentRouteForPrompt(route: CanonicalIntentRoute): string {
   return [
     'INTENT ROUTING (deterministic for this turn - follow exactly):',
