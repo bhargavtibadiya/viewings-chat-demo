@@ -32,7 +32,7 @@ import { bookingsService } from '../bookings/bookings.service.js';
 import type { ChatAction } from '../../services/ai/types/ai.types.js';
 import { enrichListerQuestion } from '../../services/ai/helpers/enrichListerQuestion.js';
 import { ALREADY_ASKED_LISTER_REPLY } from '../../services/ai/helpers/openListerQuestions.js';
-import { API_FAILURE_ACK } from '../../services/ai/policies/scopeGuard.js';
+import { API_FAILURE_ACK, pickOpeningGreeting } from '../../services/ai/policies/scopeGuard.js';
 import { formatNzDateTime } from '../../utils/helpers/date.js';
 import { createLogger } from '../../utils/helpers/logger.js';
 import { propertiesService } from '../properties/properties.service.js';
@@ -121,7 +121,41 @@ export class ChatService {
       update: {},
     });
 
+    await this.ensureOpeningGreeting(session.id);
+
     return this.toSafeSession(session);
+  }
+
+  /**
+   * First-open welcome: if the session has no messages yet, persist a varied
+   * greeting as an assistant message so visitors see help immediately.
+   */
+  private async ensureOpeningGreeting(sessionId: string): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      const existingCount = await tx.chatMessage.count({
+        where: { sessionId, ...notDeleted() },
+      });
+
+      if (existingCount > 0) {
+        return;
+      }
+
+      const session = await tx.chatSession.findFirst({
+        where: { id: sessionId, ...notDeleted() },
+        select: {
+          property: { select: { title: true } },
+        },
+      });
+
+      await tx.chatMessage.create({
+        data: {
+          sessionId,
+          role: 'ASSISTANT',
+          content: pickOpeningGreeting(session?.property.title),
+          answerStatus: 'UNKNOWN',
+        },
+      });
+    });
   }
 
   async getMessages(
@@ -130,6 +164,11 @@ export class ChatService {
     query: GetMessagesQueryDtoType,
   ): Promise<ChatMessagesResponse> {
     await this.verifySessionOwnership(userId, sessionId);
+
+    // Seed welcome on first fetch of an empty thread (covers sessions created before this feature).
+    if (!query.before) {
+      await this.ensureOpeningGreeting(sessionId);
+    }
 
     const limit = query.limit;
     const whereBase = { sessionId, ...notDeleted() };

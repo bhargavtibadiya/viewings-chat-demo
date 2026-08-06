@@ -80,8 +80,10 @@ export function ChatPage(): React.ReactElement {
 
     const cached = sessionMessagesCache[session.id];
     const hasInitialCache = cached?.fetchedKeys.includes(CHAT_MESSAGES_FETCH_INITIAL_KEY);
+    const cachedHasMessages = (cached?.messages?.length ?? 0) > 0;
 
-    if (hasInitialCache) {
+    // Re-fetch empty threads so the server can seed the opening greeting.
+    if (hasInitialCache && cachedHasMessages) {
       dispatch(hydrateMessagesFromCache({ sessionId: session.id }));
       dispatch(setActiveSessionId(session.id));
       return;
@@ -93,6 +95,7 @@ export function ChatPage(): React.ReactElement {
       getMessagesThunk({
         sessionId: session.id,
         limit: CHAT_MESSAGES_DEFAULT_LIMIT,
+        skipCache: !cachedHasMessages && hasInitialCache,
       }),
     );
     dispatch(setActiveSessionId(session.id));
