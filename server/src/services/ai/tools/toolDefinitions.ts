@@ -78,13 +78,16 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'cancel_booking',
-      description: 'Cancel an existing booking owned by the user',
+      description:
+        'Cancel an existing booking owned by the user for this property. Pass booking_id when known; if omitted, the server uses the active booking from session memory or the latest confirmed booking on this property.',
       parameters: {
         type: 'object',
         properties: {
-          booking_id: { type: 'string' },
+          booking_id: {
+            type: 'string',
+            description: 'Optional booking id. Prefer the active booking from session memory when the user says "cancel my booking".',
+          },
         },
-        required: ['booking_id'],
       },
     },
   },

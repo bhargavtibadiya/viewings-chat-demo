@@ -5,6 +5,7 @@ import { listerService } from '../../../modules/lister/lister.service.js';
 import { leadsService } from '../../../modules/leads/leads.service.js';
 import { notDeleted } from '../../../utils/helpers/softDelete.js';
 import {
+  clearActiveBookingPref,
   getBooleanArg,
   getNumberArg,
   getStringArg,
@@ -12,12 +13,16 @@ import {
   parseSessionMemory,
   parseToolArguments,
   sessionMemoryToJson,
+  setActiveBookingPref,
+  setPreferredDatePref,
   upsertMemoryFact,
 } from './sessionMemory.js';
 import { buildMemoryToolAttributes } from '../helpers/memoryAttributes.js';
 import { enrichListerQuestion } from '../helpers/enrichListerQuestion.js';
 import { resolveAvailabilitySlot } from '../helpers/resolveAvailabilitySlot.js';
-import type { AgentContext } from '../types/ai.types.js';
+import { sanitizePropertyDetailForListingType } from '../policies/listingTypePolicy.js';
+import { EMPTY_SLOTS_HINT } from '../policies/scopeGuard.js';
+import type { AgentContext, SessionMemory } from '../types/ai.types.js';
 import { createLogger } from '../../../utils/helpers/logger.js';
 import { ServiceError } from '../../../utils/helpers/serviceError.js';
 
@@ -34,15 +39,15 @@ export class ToolHandlers {
 
       switch (toolName) {
         case 'get_property':
-          return await this.getProperty(this.resolvePropertyId(args, context));
+          return await this.getProperty(this.resolvePropertyId(args, context), context);
         case 'search_listings':
           return await this.searchListings(args);
         case 'get_availability':
-          return await this.getAvailability(this.resolvePropertyId(args, context), args);
+          return await this.getAvailability(this.resolvePropertyId(args, context), args, context);
         case 'create_booking':
           return await this.createBooking(context.userId, args, context);
         case 'cancel_booking':
-          return await this.cancelBooking(context.userId, args);
+          return await this.cancelBooking(context.userId, args, context);
         case 'send_question_to_lister':
           return await this.sendQuestionToLister(context, args);
         case 'get_open_lister_questions':
@@ -94,14 +99,68 @@ export class ToolHandlers {
     return context.propertyId;
   }
 
-  private async getProperty(propertyId: string): Promise<string> {
+  private async loadSessionMemory(sessionId: string): Promise<{
+    sessionId: string;
+    memory: SessionMemory;
+  } | null> {
+    const session = await prisma.chatSession.findFirst({
+      where: { id: sessionId, ...notDeleted() },
+    });
+    if (!session) {
+      return null;
+    }
+    return { sessionId: session.id, memory: parseSessionMemory(session.contextMemory) };
+  }
+
+  private async saveSessionMemory(sessionId: string, memory: SessionMemory): Promise<void> {
+    await prisma.chatSession.update({
+      where: { id: sessionId },
+      data: { contextMemory: sessionMemoryToJson(memory) },
+    });
+  }
+
+  private async getProperty(propertyId: string, context: AgentContext): Promise<string> {
     const property = await propertiesService.getPropertyForTools(propertyId);
-    return JSON.stringify(property);
+    const sanitized = sanitizePropertyDetailForListingType({
+      ...property,
+      listingType: context.listingType,
+    });
+
+    // Persist core pricing/facts so later turns stay consistent.
+    const loaded = await this.loadSessionMemory(context.sessionId);
+    if (loaded) {
+      let memory = loaded.memory;
+      if (sanitized.listingType === 'RENTAL' && sanitized.rentWeekly != null) {
+        memory = upsertMemoryFact(memory, {
+          attribute: 'weekly_rent',
+          value: String(sanitized.rentWeekly),
+          source: 'listing_attribute',
+        });
+      }
+      if (sanitized.listingType === 'RENTAL' && sanitized.bond != null) {
+        memory = upsertMemoryFact(memory, {
+          attribute: 'bond',
+          value: String(sanitized.bond),
+          source: 'listing_attribute',
+        });
+      }
+      if (sanitized.listingType === 'SALE' && sanitized.price != null) {
+        memory = upsertMemoryFact(memory, {
+          attribute: 'price',
+          value: String(sanitized.price),
+          source: 'listing_attribute',
+        });
+      }
+      await this.saveSessionMemory(loaded.sessionId, memory);
+    }
+
+    return JSON.stringify(sanitized);
   }
 
   private async searchListings(args: Record<string, unknown>): Promise<string> {
     const listingTypeRaw = getStringArg(args, 'listing_type');
-    const listingType = listingTypeRaw === 'RENTAL' || listingTypeRaw === 'SALE' ? listingTypeRaw : undefined;
+    const listingType =
+      listingTypeRaw === 'RENTAL' || listingTypeRaw === 'SALE' ? listingTypeRaw : undefined;
 
     const results = await propertiesService.searchListings({
       search: getStringArg(args, 'search'),
@@ -114,7 +173,11 @@ export class ToolHandlers {
     return JSON.stringify({ listings: results });
   }
 
-  private async getAvailability(propertyId: string, args: Record<string, unknown>): Promise<string> {
+  private async getAvailability(
+    propertyId: string,
+    args: Record<string, unknown>,
+    context: AgentContext,
+  ): Promise<string> {
     const fromIso = getStringArg(args, 'from_iso');
     const toIso = getStringArg(args, 'to_iso');
 
@@ -122,6 +185,21 @@ export class ToolHandlers {
       from: fromIso,
       to: toIso,
     });
+
+    const loaded = await this.loadSessionMemory(context.sessionId);
+    if (loaded && (fromIso || toIso)) {
+      const memory = setPreferredDatePref(loaded.memory, { fromIso, toIso });
+      await this.saveSessionMemory(loaded.sessionId, memory);
+    }
+
+    if (result.slots.length === 0) {
+      return JSON.stringify({
+        ...result,
+        empty: true,
+        message: EMPTY_SLOTS_HINT,
+        hint: 'Offer another date and call get_availability again with from_iso/to_iso for that day or range.',
+      });
+    }
 
     return JSON.stringify(result);
   }
@@ -186,6 +264,16 @@ export class ToolHandlers {
         notes: getStringArg(args, 'notes'),
       });
 
+      const loaded = await this.loadSessionMemory(context.sessionId);
+      if (loaded) {
+        const memory = setActiveBookingPref(loaded.memory, {
+          bookingId: result.booking.id,
+          slotLabel: resolved.label,
+          startsAt: resolved.startsAt,
+        });
+        await this.saveSessionMemory(loaded.sessionId, memory);
+      }
+
       return JSON.stringify({
         ...result,
         bookedSlot: {
@@ -201,31 +289,83 @@ export class ToolHandlers {
         return JSON.stringify({
           error: error.message,
           statusCode: error.statusCode,
-          availableSlots: availability?.slots.map((slot) => ({
-            id: slot.id,
-            label: slot.label,
-            startsAt: slot.startsAt,
-            endsAt: slot.endsAt,
-            timezone: slot.timezone,
-          })) ?? [],
+          availableSlots:
+            availability?.slots.map((slot) => ({
+              id: slot.id,
+              label: slot.label,
+              startsAt: slot.startsAt,
+              endsAt: slot.endsAt,
+              timezone: slot.timezone,
+            })) ?? [],
+          message:
+            'Booking failed. Share the error briefly and offer the availableSlots (UI will show buttons). Do not invent a confirmation.',
         });
       }
       throw error;
     }
   }
 
-  private async cancelBooking(userId: string, args: Record<string, unknown>): Promise<string> {
-    const bookingId = getStringArg(args, 'booking_id');
+  private async resolveBookingIdForCancel(
+    userId: string,
+    context: AgentContext,
+    args: Record<string, unknown>,
+  ): Promise<string | null> {
+    const explicit = getStringArg(args, 'booking_id');
+    if (explicit) {
+      return explicit;
+    }
+
+    const loaded = await this.loadSessionMemory(context.sessionId);
+    const fromMemory = loaded?.memory.prefs.active_booking_id;
+    if (typeof fromMemory === 'string' && fromMemory.length > 0) {
+      return fromMemory;
+    }
+
+    const latest = await prisma.booking.findFirst({
+      where: {
+        userId,
+        propertyId: context.propertyId,
+        status: 'CONFIRMED',
+        ...notDeleted(),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+
+    return latest?.id ?? null;
+  }
+
+  private async cancelBooking(
+    userId: string,
+    args: Record<string, unknown>,
+    context: AgentContext,
+  ): Promise<string> {
+    const bookingId = await this.resolveBookingIdForCancel(userId, context, args);
     if (!bookingId) {
-      return JSON.stringify({ error: 'booking_id is required' });
+      return JSON.stringify({
+        error: 'No booking found to cancel for this property',
+        statusCode: 404,
+        hint: 'Ask the user to open My bookings, or confirm which viewing they mean.',
+      });
     }
 
     try {
       const booking = await bookingsService.cancelBookingFromTool(userId, bookingId);
-      return JSON.stringify({ booking, cancelled: true });
+      const loaded = await this.loadSessionMemory(context.sessionId);
+      if (loaded) {
+        const memory = clearActiveBookingPref(loaded.memory);
+        await this.saveSessionMemory(loaded.sessionId, memory);
+      }
+      return JSON.stringify({ booking, cancelled: true, bookingId });
     } catch (error) {
       if (error instanceof ServiceError) {
-        return JSON.stringify({ error: error.message, statusCode: error.statusCode });
+        return JSON.stringify({
+          error: error.message,
+          statusCode: error.statusCode,
+          bookingId,
+          message:
+            'Cancel failed. Explain briefly (e.g. already cancelled / not found) and point the user to My bookings if needed.',
+        });
       }
       throw error;
     }
