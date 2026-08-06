@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   classifyInputScope,
+  cannedReplyForScope,
+  GREETING_ACK,
+  GREETING_ACK_RETURNING,
+  hasPriorAssistantTurn,
   looksLikePropertyQuestion,
 } from './scopeGuard.js';
 
@@ -29,6 +33,30 @@ describe('scopeGuard', () => {
   it('classifies greeting and thanks', () => {
     assert.equal(classifyInputScope('Hello'), 'greeting');
     assert.equal(classifyInputScope('thanks'), 'thanks');
+  });
+
+  it('returns full greeting only for new sessions', () => {
+    assert.equal(cannedReplyForScope('greeting'), GREETING_ACK);
+    assert.equal(
+      cannedReplyForScope('greeting', { isReturningSession: false }),
+      GREETING_ACK,
+    );
+    assert.equal(
+      cannedReplyForScope('greeting', { isReturningSession: true }),
+      GREETING_ACK_RETURNING,
+    );
+  });
+
+  it('detects prior assistant turns for session awareness', () => {
+    assert.equal(hasPriorAssistantTurn([]), false);
+    assert.equal(hasPriorAssistantTurn([{ role: 'USER', content: 'Hi' }]), false);
+    assert.equal(
+      hasPriorAssistantTurn([
+        { role: 'USER', content: 'Hi' },
+        { role: 'ASSISTANT', content: 'Hello' },
+      ]),
+      true,
+    );
   });
 
   it('refuses jailbreaks', () => {

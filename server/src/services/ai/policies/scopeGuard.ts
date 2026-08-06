@@ -6,13 +6,24 @@
 export const SCOPE_REFUSAL =
   'I can only help with questions about this property — things like price, features, availability, or booking a viewing. What would you like to know?';
 
+/** Full greeting — only for the first turn of a session. */
 export const GREETING_ACK =
   'Hi! Ask me anything about this property — price, features, availability, or booking a viewing.';
 
-export const THANKS_ACK = "You're welcome. Happy to help with anything else about this property.";
+/** Short ack when the user greets again mid-session. */
+export const GREETING_ACK_RETURNING =
+  "Hi again! Happy to keep going — what would you like to know?";
+
+export const THANKS_ACK = "You're welcome — anything else about this property?";
 
 export const UNCLEAR_ACK =
   "Sorry, I don't quite get that. Could you rephrase your question about this property?";
+
+export const API_FAILURE_ACK =
+  "Sorry, I hit a temporary issue just now. Please try that again in a moment.";
+
+export const EMPTY_SLOTS_HINT =
+  'No free viewing times in that range. Try another date, or ask me to check a wider window.';
 
 export type InputScopeClass = 'allow' | 'refuse' | 'greeting' | 'thanks' | 'unclear';
 
@@ -216,12 +227,30 @@ export function looksLikeOffScopeOutput(output: string): boolean {
   return false;
 }
 
-export function cannedReplyForScope(scope: InputScopeClass): string | null {
+export interface CannedReplyOptions {
+  /** True when the session already has assistant turns (or a prior greeting). */
+  isReturningSession?: boolean;
+}
+
+/**
+ * True when this chat already has an assistant message — treat further "hi/hello"
+ * as mid-conversation, not a fresh open.
+ */
+export function hasPriorAssistantTurn(
+  recentMessages: Array<{ role: string; content?: string }>,
+): boolean {
+  return recentMessages.some((message) => message.role === 'ASSISTANT' || message.role === 'assistant');
+}
+
+export function cannedReplyForScope(
+  scope: InputScopeClass,
+  options: CannedReplyOptions = {},
+): string | null {
   switch (scope) {
     case 'refuse':
       return SCOPE_REFUSAL;
     case 'greeting':
-      return GREETING_ACK;
+      return options.isReturningSession ? GREETING_ACK_RETURNING : GREETING_ACK;
     case 'thanks':
       return THANKS_ACK;
     case 'unclear':
