@@ -1,12 +1,17 @@
-/**
- * Rebuild a standalone lister question when the seeker only typed a
- * bare follow-up ("why", "ok", "ask them") after a property topic.
- */
+// ============================================================================
+// LISTER QUESTION ENRICHMENT
+// Rebuild standalone lister questions from vague seeker follow-ups
+// ============================================================================
 
 export interface ListerQuestionMessage {
   role: string;
   content: string;
 }
+
+// ============================================================================
+// DETECTION PATTERNS
+// Regexes and topic labels used to classify vague follow-ups
+// ============================================================================
 
 const BARE_FOLLOW_UP =
   /^(why|why\?|how|how\?|ok|okay|yes|yeah|yep|sure|please|thanks|thank you|cheers|go ahead|do it|yes please|please do|i want to know(?:\s+it|\s+that|\s+this)?|tell me|let me know)[\s!.?]*$/i;
@@ -20,7 +25,7 @@ const CTA_OFFER_ONLY =
 const PROPERTY_CLAIM =
   /not (?:allowed|specified|available|permitted)|do not have|don't have|body corporate|unknown|unfortunately|are not|is not|no pets|pets are|parking|smoking|furnished|floor area|bedrooms?/i;
 
-/** Known property topic phrases the assistant may list as missing. */
+// [NOTE] maps assistant wording to stable labels for escalation questions
 const UNKNOWN_TOPIC_PHRASES: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /\bfloor\s*area\b|\bsqm\b|\bsquare\s+metr/i, label: 'floor area' },
   { pattern: /\bcouncil\s+rates?\b|\brates\b/i, label: 'council rates' },
@@ -41,6 +46,17 @@ const UNKNOWN_TOPIC_PHRASES: Array<{ pattern: RegExp; label: string }> = [
 const UNKNOWN_SIGNAL =
   /not\s+specified|not\s+listed|don'?t\s+have|do\s+not\s+have|unknown|missing|i(?:'|’)ll\s+ask|ask\s+the\s+lister|would you like me to ask/i;
 
+// ============================================================================
+// EXPORTED CLASSIFIERS
+// Detect vague follow-ups and named unknown topics from assistant text
+// ============================================================================
+
+/**
+ * Detects whether seeker text is too vague to send to a lister as-is.
+ *
+ * @param text - Raw seeker message to classify
+ * @returns True when the text is empty, a bare follow-up, or a short vague prompt
+ */
 export function isBareOrVagueListerQuestion(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.length === 0) {
@@ -49,20 +65,28 @@ export function isBareOrVagueListerQuestion(text: string): boolean {
   if (BARE_FOLLOW_UP.test(trimmed) || ASK_LISTER_TRIGGER.test(trimmed)) {
     return true;
   }
+  // [WHY] short prompts starting with why/how/etc. lack a topic without history
   if (trimmed.length < 16 && /^(why|how|what|and|but|ok|okay)\b/i.test(trimmed)) {
     return true;
   }
   return false;
 }
 
-/** True when the seeker is confirming an ask-the-lister escalation. */
+/**
+ * Detects whether the seeker is confirming an ask-the-lister escalation.
+ *
+ * @param text - Raw seeker message to classify
+ * @returns True when the text matches an ask/escalate confirmation phrase
+ */
 export function isAskListerConfirmation(text: string): boolean {
   return ASK_LISTER_TRIGGER.test(text.trim());
 }
 
 /**
- * Pull topic labels the assistant marked as unknown / offered to escalate.
- * Used so vague "ask please" escalates only those named topics.
+ * Pulls topic labels the assistant marked as unknown or offered to escalate.
+ *
+ * @param assistantContent - Recent assistant reply that may name missing topics
+ * @returns Deduplicated topic labels in phrase-table order, or empty if none signaled
  */
 export function extractNamedUnknownTopics(assistantContent: string): string[] {
   if (!assistantContent || !UNKNOWN_SIGNAL.test(assistantContent)) {
@@ -79,6 +103,11 @@ export function extractNamedUnknownTopics(assistantContent: string): string[] {
   }
   return found;
 }
+
+// ============================================================================
+// PRIVATE RECONSTRUCTION HELPERS
+// Turn chat history into a self-contained question a lister can answer
+// ============================================================================
 
 function normalizeRole(role: string): 'USER' | 'ASSISTANT' | 'OTHER' {
   const upper = role.toUpperCase();
@@ -109,7 +138,7 @@ function toWhyQuestion(claim: string): string {
     return 'Why is that the case for this property?';
   }
 
-  // "Pets are not allowed..." → "Why are pets not allowed...?"
+  // [WHY] rewrite "Pets are not allowed" → "Why are pets not allowed?"
   const copulaMatch = body.match(/^(.+?)\s+(are|is|was|were|has|have)\s+(.+)$/i);
   if (copulaMatch?.[1] && copulaMatch[2] && copulaMatch[3]) {
     const subject = copulaMatch[1];
@@ -150,6 +179,7 @@ function findSubstantiveUserTopics(messages: ListerQuestionMessage[]): string[] 
       continue;
     }
     topics.push(content);
+    // [PERF] cap lookback — only the latest few topics matter for enrichment
     if (topics.length >= 3) {
       break;
     }
@@ -157,9 +187,7 @@ function findSubstantiveUserTopics(messages: ListerQuestionMessage[]): string[] 
   return topics;
 }
 
-/**
- * Prefer an assistant reply that states a property fact, skipping pure CTA offers.
- */
+// [NOTE] prefers property-fact replies; skips short CTA-only offers
 function findRelevantAssistantClaim(messages: ListerQuestionMessage[]): string {
   let fallback = '';
   for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -174,6 +202,7 @@ function findRelevantAssistantClaim(messages: ListerQuestionMessage[]): string {
     if (!fallback) {
       fallback = content;
     }
+    // [WHY] short CTA-only offers lack a fact to rewrite into a why-question
     if (CTA_OFFER_ONLY.test(content) && content.length < 160) {
       continue;
     }
@@ -184,8 +213,17 @@ function findRelevantAssistantClaim(messages: ListerQuestionMessage[]): string {
   return fallback;
 }
 
+// ============================================================================
+// MAIN ENRICHMENT
+// Public entry: expand vague seeker text using recent chat context
+// ============================================================================
+
 /**
  * Returns a clear, standalone question a lister can answer without chat history.
+ *
+ * @param questionText - Seeker message that may be a bare follow-up
+ * @param recentMessages - Recent user/assistant turns for topic reconstruction
+ * @returns Enriched question text, or the original when already substantive
  */
 export function enrichListerQuestion(
   questionText: string,
@@ -210,14 +248,14 @@ export function enrichListerQuestion(
   }
 
   if (ASK_LISTER_TRIGGER.test(candidate)) {
-    // Prefer unknowns the assistant already named (avoid bundling unrelated history).
+    // [WHY] prefer unknowns the assistant named — avoids bundling unrelated history
     if (namedUnknowns.length > 0) {
       return questionFromUnknownTopics(namedUnknowns);
     }
     if (/^why\b/i.test(lastUserTopic) && assistantClaim) {
       return toWhyQuestion(assistantClaim);
     }
-    // Walk: pets question → why → ask them. Prefer why-style reconstruction from the fact reply.
+    // [WHY] walk pets → why → ask them: reconstruct why from the fact reply
     if (assistantClaim && PROPERTY_CLAIM.test(assistantClaim)) {
       return toWhyQuestion(assistantClaim);
     }
