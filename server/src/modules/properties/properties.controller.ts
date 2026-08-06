@@ -15,6 +15,14 @@ export class PropertiesController {
     this.propertiesService = new PropertiesService();
   }
 
+  /**
+   * Lists properties using validated query filters.
+   *
+   * @param req - Express request containing property filters
+   * @param res - Express response used to return properties
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   listProperties = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const queryResult = PropertyQueryDto.safeParse(req.query);
@@ -34,6 +42,14 @@ export class PropertiesController {
     }
   };
 
+  /**
+   * Returns detail for one property.
+   *
+   * @param req - Express request containing the property ID
+   * @param res - Express response used to return property detail
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   getPropertyById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { propertyId } = req.params;
@@ -49,6 +65,14 @@ export class PropertiesController {
     }
   };
 
+  /**
+   * Returns available viewing slots for one property.
+   *
+   * @param req - Express request containing the property ID and date filters
+   * @param res - Express response used to return availability
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   getAvailability = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { propertyId } = req.params;
