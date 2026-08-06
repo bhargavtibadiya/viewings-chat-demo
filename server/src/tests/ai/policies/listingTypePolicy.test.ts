@@ -4,7 +4,7 @@ import {
   filterAttributesForListingType,
   filterAttributeRecordsForListingType,
   sanitizePropertyDetailForListingType,
-} from './listingTypePolicy.js';
+} from '../../../services/ai/policies/listingTypePolicy.js';
 
 describe('listingTypePolicy', () => {
   it('filters rental-only attributes from SALE', () => {
