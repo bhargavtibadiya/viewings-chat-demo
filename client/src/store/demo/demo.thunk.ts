@@ -8,6 +8,12 @@ import type {
   IGetTurnLogsThunkResponse,
 } from '@/store/demo/demo.types';
 
+/**
+ * Retrieves debug turn logs for a chat session.
+ *
+ * @param data - Session identifier
+ * @returns A dispatchable action resolving with turn logs or an API error
+ */
 export const getTurnLogsThunk = createAsyncThunk<
   IGetTurnLogsThunkResponse,
   IGetTurnLogsThunkPayload,

@@ -10,6 +10,16 @@ import type {
   IAnswerQuestionThunkResponse,
 } from '@/store/lister/lister.types';
 
+// ============================================================================
+// LISTER QUESTION THUNKS
+// Retrieves escalated questions and records lister responses
+// ============================================================================
+
+/**
+ * Retrieves questions available to the authenticated lister.
+ *
+ * @returns A dispatchable action resolving with lister questions or an API error
+ */
 export const getQuestionsThunk = createAsyncThunk<
   IGetQuestionsThunkResponse,
   void,
@@ -26,10 +36,17 @@ export const getQuestionsThunk = createAsyncThunk<
     }
   },
   {
+    // [PERF] Suppress duplicate list requests while questions are already loading.
     condition: (_, { getState }) => !getState().lister.getQuestionsLoading,
   },
 );
 
+/**
+ * Submits an answer to an escalated lister question.
+ *
+ * @param data - Question identifier and answer text
+ * @returns A dispatchable action resolving with the updated question or an API error
+ */
 export const answerQuestionThunk = createAsyncThunk<
   IAnswerQuestionThunkResponse,
   IAnswerQuestionThunkPayload,
