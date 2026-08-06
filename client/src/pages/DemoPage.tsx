@@ -9,6 +9,11 @@ import { EVIDENCE_PROMPTS } from '@/utils/helpers/evidencePrompts';
 import { findPropertyByFixtureKey } from '@/utils/helpers/propertyFormatters';
 import type { ITurnToolCall } from '@/store/types';
 
+/**
+ * Displays demo fixtures and logs for the session most recently opened in chat.
+ *
+ * @returns The demo-administration route content or an access notice
+ */
 export function DemoPage(): React.ReactElement {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
@@ -19,6 +24,7 @@ export function DemoPage(): React.ReactElement {
   const hasRequestedProperties = useAppSelector((state) => state.properties.hasRequestedProperties);
 
   useEffect(() => {
+    // [WHY] fixture links resolve against the shared property cache instead of a duplicate fetch.
     if (hasRequestedProperties) return;
     dispatch(getPropertiesThunk());
   }, [dispatch, hasRequestedProperties]);
@@ -152,6 +158,12 @@ export function DemoPage(): React.ReactElement {
   );
 }
 
+/**
+ * Formats the tool names captured for a demo turn.
+ *
+ * @param tools - Tool calls recorded for the turn
+ * @returns Comma-separated tool names, or a readable empty-state label
+ */
 function formatTurnTools(tools: ITurnToolCall[]): string {
   if (tools.length === 0) {
     return 'None';

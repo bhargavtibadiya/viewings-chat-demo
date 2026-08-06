@@ -5,6 +5,11 @@ import { answerQuestionThunk, getQuestionsThunk } from '@/store/lister/lister.th
 import { useToast } from '@/components/ui';
 import type { IListerQuestion } from '@/store/types';
 
+/**
+ * Lists escalated questions for listers and demo administrators.
+ *
+ * @returns The lister-question route content or an access notice
+ */
 export function ListerQuestionsPage(): React.ReactElement {
   const dispatch = useAppDispatch();
   const questions = useAppSelector((state) => state.lister.questions);
@@ -13,6 +18,7 @@ export function ListerQuestionsPage(): React.ReactElement {
   const user = useAppSelector((state) => state.auth.user);
 
   useEffect(() => {
+    // [WHY] avoid duplicating the inbox request while its cached result remains current.
     if (hasRequested || loading) return;
     dispatch(getQuestionsThunk());
   }, [dispatch, hasRequested, loading]);
@@ -83,12 +89,24 @@ interface QuestionCardProps {
   readOnly?: boolean;
 }
 
+/**
+ * Renders an escalated question and, when editable, publishes an approved answer.
+ *
+ * @param props - Question data and whether its answer is read-only
+ * @returns The question card
+ */
 function QuestionCard({ question, readOnly = false }: QuestionCardProps): React.ReactElement {
   const dispatch = useAppDispatch();
   const answerLoading = useAppSelector((state) => state.lister.answerQuestionLoading);
   const { show } = useToast();
   const [answerText, setAnswerText] = useState('');
 
+  /**
+   * Publishes the trimmed answer and clears the form after success.
+   *
+   * @param event - Native form submission event
+   * @returns A promise that settles after the answer request completes
+   */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     const result = await dispatch(

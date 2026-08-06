@@ -10,6 +10,11 @@ import {
   formatListingType,
 } from '@/utils/helpers/propertyFormatters';
 
+/**
+ * Displays a property and routes visitors into its dedicated chat session.
+ *
+ * @returns The property-detail route content
+ */
 export function PropertyDetailPage(): React.ReactElement {
   const { propertyId = '' } = useParams();
   const dispatch = useAppDispatch();
@@ -21,6 +26,7 @@ export function PropertyDetailPage(): React.ReactElement {
     if (propertyId.length === 0) return;
     dispatch(getPropertyByIdThunk({ propertyId }));
     return () => {
+      // [WHY] prevent a previous listing from flashing while the next route loads.
       dispatch(clearPropertyDetail());
     };
   }, [dispatch, propertyId]);
@@ -145,6 +151,12 @@ interface FactRowProps {
   value: string;
 }
 
+/**
+ * Renders one labeled property fact in the summary card.
+ *
+ * @param props - Icon, label, and value for the fact
+ * @returns A description-list entry
+ */
 function FactRow({ icon, label, value }: FactRowProps): React.ReactElement {
   return (
     <div className="flex items-center justify-between gap-2">
