@@ -1,13 +1,13 @@
 import type OpenAI from 'openai';
-import type { AnswerStatus, ChatMessage, ListingType } from '../../generated/client.js';
-import { env } from '../../config/env.js';
-import prisma from '../../config/prisma.js';
-import { getOpenAIClient, getOpenAIModel } from './openai.client.js';
-import { toolDefinitions } from './tools/toolDefinitions.js';
-import { toolHandlers } from './tools/toolHandlers.js';
-import { formatSessionMemoryForPrompt, parseSessionMemory } from './tools/sessionMemory.js';
-import { buildListingTypeGuidance } from './policies/listingTypePolicy.js';
-import { deriveAnswerStatus, pickActions } from './policies/ctaPolicy.js';
+import type { AnswerStatus, ChatMessage, ListingType } from '../../../generated/client.js';
+import { env } from '../../../config/env.js';
+import prisma from '../../../config/prisma.js';
+import { getOpenAIClient, getOpenAIModel } from '../client/openai.client.js';
+import { toolDefinitions } from '../tools/toolDefinitions.js';
+import { toolHandlers } from '../tools/toolHandlers.js';
+import { formatSessionMemoryForPrompt, parseSessionMemory } from '../memory/sessionMemory.js';
+import { buildListingTypeGuidance } from '../policies/listingTypePolicy.js';
+import { deriveAnswerStatus, pickActions } from '../policies/ctaPolicy.js';
 import {
   API_FAILURE_ACK,
   cannedReplyForScope,
@@ -15,36 +15,54 @@ import {
   hasPriorAssistantTurn,
   looksLikeOffScopeOutput,
   SCOPE_REFUSAL,
-} from './policies/scopeGuard.js';
-import { enrichListerQuestion, isAskListerConfirmation } from './helpers/enrichListerQuestion.js';
+} from '../policies/scopeGuard.js';
+import { enrichListerQuestion, isAskListerConfirmation } from '../helpers/lister/enrichListerQuestion.js';
 import {
   ALREADY_ASKED_LISTER_REPLY,
   findSimilarOpenQuestion,
   formatOpenQuestionsForPrompt,
-} from './helpers/openListerQuestions.js';
-import { extractBookSlotActions } from './helpers/bookSlotActions.js';
-import { polishAssistantContent } from './helpers/responseQuality.js';
+} from '../helpers/lister/openListerQuestions.js';
+import { extractBookSlotActions } from '../helpers/booking/bookSlotActions.js';
+import { polishAssistantContent } from '../helpers/quality/responseQuality.js';
 import {
   formatAlreadyKnownListerReply,
   type KnownListingFact,
-} from './helpers/knownListingAnswers.js';
+} from '../helpers/lister/knownListingAnswers.js';
 import {
   formatIntentRouteForPrompt,
   resolveCanonicalIntent,
-} from './helpers/intentRouting.js';
-import { listerService } from '../../modules/lister/lister.service.js';
-import { AI } from '../../utils/constants/pagination.js';
-import type { AgentContext, AgentRunResult, ChatAction, ChatFact, ToolCallRecord } from './types/ai.types.js';
-import { createLogger } from '../../utils/helpers/logger.js';
-import { isRecord } from '../../utils/helpers/json.js';
-import { notDeleted } from '../../utils/helpers/softDelete.js';
+} from '../helpers/routing/intentRouting.js';
+import { listerService } from '../../../modules/lister/lister.service.js';
+import { AI } from '../../../utils/constants/pagination.js';
+import type { AgentContext, AgentRunResult, ChatAction, ChatFact, ToolCallRecord } from '../types/ai.types.js';
+import { createLogger } from '../../../utils/helpers/logger.js';
+import { isRecord } from '../../../utils/helpers/json.js';
+import { notDeleted } from '../../../utils/helpers/softDelete.js';
 
 const logger = createLogger('AgentLoop');
 
+// ============================================================================
+// LOOP HELPERS
+// Pure helpers for tool-result parsing, short-circuits, and prompt snapshot lines
+// ============================================================================
+
+/**
+ * True when the completion message contains one or more tool calls.
+ *
+ * @param message - OpenAI assistant message from a completion choice
+ * @returns Whether tool_calls is present and non-empty
+ */
 function isToolCallMessage(message: OpenAI.Chat.Completions.ChatCompletionMessage): boolean {
   return Boolean(message.tool_calls && message.tool_calls.length > 0);
 }
 
+/**
+ * Parses a tool result `attributes` array into ChatFact entries.
+ *
+ * @param attributesValue - Unknown JSON value expected to be an attributes array
+ * @param defaultSource - Source label when an entry omits source
+ * @returns Deduplicated-ready fact list (caller may dedupe further)
+ */
 function parseAttributeEntries(
   attributesValue: unknown,
   defaultSource: string,
@@ -92,6 +110,12 @@ function parseAttributeEntries(
   return facts;
 }
 
+/**
+ * Collects verified facts from property / memory / approved-answer tool results.
+ *
+ * @param toolsCalled - Tool call records from this turn
+ * @returns Deduplicated ChatFact list
+ */
 function extractFactsFromToolResults(toolsCalled: ToolCallRecord[]): ChatFact[] {
   const facts: ChatFact[] = [];
   const seen = new Set<string>();
@@ -133,6 +157,12 @@ function extractFactsFromToolResults(toolsCalled: ToolCallRecord[]): ChatFact[] 
   return facts;
 }
 
+/**
+ * Heuristic: assistant copy admits missing data or offers to ask the lister.
+ *
+ * @param content - Final assistant text
+ * @returns Whether the reply should count as unknown intent for answer status
+ */
 function detectUnknownIntent(content: string): boolean {
   const lowered = content.toLowerCase();
   return (
@@ -144,6 +174,12 @@ function detectUnknownIntent(content: string): boolean {
   );
 }
 
+/**
+ * Maps DB chat messages into the enrichment helper shape.
+ *
+ * @param recentMessages - Recent ChatMessage rows
+ * @returns Role/content pairs for enrichListerQuestion
+ */
 function toHistoryMessages(
   recentMessages: ChatMessage[],
 ): Array<{ role: string; content: string }> {
@@ -153,6 +189,14 @@ function toHistoryMessages(
   }));
 }
 
+/**
+ * Builds a minimal AgentRunResult for pre-LLM short-circuits (scope, API failure).
+ *
+ * @param content - Canned reply text
+ * @param intent - Debug intent label recorded in the trace
+ * @param start - Performance.now()-style start timestamp in ms
+ * @returns AgentRunResult with empty tools/facts/actions
+ */
 function buildShortCircuitResult(
   content: string,
   intent: string,
@@ -175,6 +219,12 @@ function buildShortCircuitResult(
   };
 }
 
+/**
+ * True when send_question_to_lister reported an existing OPEN question.
+ *
+ * @param toolsCalled - Tool call records from this turn
+ * @returns Whether any lister tool returned alreadyAsked
+ */
 function toolReturnedAlreadyAsked(toolsCalled: ToolCallRecord[]): boolean {
   for (const tool of toolsCalled) {
     if (tool.name !== 'send_question_to_lister') {
@@ -186,12 +236,18 @@ function toolReturnedAlreadyAsked(toolsCalled: ToolCallRecord[]): boolean {
         return true;
       }
     } catch {
-      // ignore parse errors
+      // [NOTE] ignore unparseable tool payloads
     }
   }
   return false;
 }
 
+/**
+ * Extracts alreadyKnown facts/reply from send_question_to_lister when present.
+ *
+ * @param toolsCalled - Tool call records from this turn
+ * @returns Known facts and canned reply, or null
+ */
 function toolReturnedAlreadyKnown(toolsCalled: ToolCallRecord[]): {
   facts: KnownListingFact[];
   reply: string;
@@ -230,12 +286,21 @@ function toolReturnedAlreadyKnown(toolsCalled: ToolCallRecord[]): {
 
       return { facts, reply };
     } catch {
-      // ignore parse errors
+      // [NOTE] ignore unparseable tool payloads
     }
   }
   return null;
 }
 
+/**
+ * Builds a system-prompt line with verified rent/price/beds for this listing.
+ *
+ * @param listingType - RENTAL or SALE
+ * @param propertyTitle - Display title
+ * @param propertyId - Listing id
+ * @param snapshot - Optional verified numeric fields from the DB
+ * @returns Single prompt line anchoring facts to this property only
+ */
 function buildVerifiedSnapshotLine(
   listingType: ListingType,
   propertyTitle: string,
@@ -277,7 +342,25 @@ function buildVerifiedSnapshotLine(
   return parts.join(' ');
 }
 
+// ============================================================================
+// AGENT LOOP
+// Orchestrates scope guards, OpenAI tool iterations, and post-tool reply shaping
+// ============================================================================
+
+/**
+ * Runs one agent turn: scope short-circuits, tool loop, then CTA/fact assembly.
+ */
 export class AgentLoop {
+  /**
+   * Executes the full agent turn for a user message in a listing chat session.
+   *
+   * @param context - Session, user, property, and current user message
+   * @param recentMessages - Prior chat turns for history and enrichment
+   * @param listingType - RENTAL or SALE policy context
+   * @param propertyTitle - Listing title for prompts and greetings
+   * @param propertySnapshot - Optional verified numeric fields for the system prompt
+   * @returns Final assistant content, facts, actions, tools, and debug trace
+   */
   async run(
     context: AgentContext,
     recentMessages: ChatMessage[],
@@ -301,6 +384,7 @@ export class AgentLoop {
     const scope = classifyInputScope(context.userMessage);
     const isReturningSession = hasPriorAssistantTurn(recentMessages);
     const canned = cannedReplyForScope(scope, { isReturningSession });
+    // [WHY] refuse / greeting / thanks / unclear never need tools — skip the LLM entirely
     if (canned) {
       logger.info(
         `Scope guard short-circuit scope=${scope} returning=${isReturningSession} sessionId=${context.sessionId} preview=${context.userMessage.slice(0, 120)}`,
@@ -331,8 +415,7 @@ export class AgentLoop {
     ];
     const enrichedUserQuestion = enrichListerQuestion(context.userMessage, enrichmentMessages);
 
-    // Match the raw question; only use enrichment for explicit "ask them" confirmations
-    // so bare "ok"/"thanks" do not falsely hit an open escalation.
+    // [WHY] match raw text first; only enrich for explicit "ask them" so bare "ok"/"thanks" do not hit open escalations
     const matchingOpen =
       findSimilarOpenQuestion(openQuestions, {
         questionText: context.userMessage,
@@ -343,8 +426,7 @@ export class AgentLoop {
           })
         : null);
 
-    // Deterministic short-circuit: topic already escalated and still OPEN
-    // (includes repeat questions and "ask them" confirmations).
+    // [WHY] topic already OPEN with the lister — deterministic reply without another tool round-trip
     if (matchingOpen) {
       logger.info(
         `Already-asked short-circuit sessionId=${context.sessionId} openQuestionId=${matchingOpen.id}`,
@@ -493,6 +575,7 @@ export class AgentLoop {
           reasoning_effort: env.OPENAI_REASONING_EFFORT,
         } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
       } catch (error) {
+        // [WHY] surface a canned ack instead of throwing — chat UX must stay responsive on API blips
         logger.error(`OpenAI completion failed sessionId=${context.sessionId}`, error);
         return buildShortCircuitResult(API_FAILURE_ACK, 'api_failure', start);
       }
@@ -547,6 +630,7 @@ export class AgentLoop {
       break;
     }
 
+    // [WHY] post-LLM guard — replace code dumps even if the model ignored scope instructions
     if (looksLikeOffScopeOutput(finalContent)) {
       logger.warn(
         `Output scope guard replaced off-scope reply sessionId=${context.sessionId} preview=${finalContent.slice(0, 160)}`,
@@ -559,10 +643,11 @@ export class AgentLoop {
     let hasUnknown = detectUnknownIntent(finalContent);
     let answerStatus: AnswerStatus = deriveAnswerStatus(facts, hasUnknown);
 
-    // Tool-level dedupe mid-turn (e.g. createQuestion found a similar OPEN after enrichment).
+    // [NOTE] tool-level dedupe mid-turn (e.g. createQuestion found a similar OPEN after enrichment)
     const alreadyAskedViaTool = toolReturnedAlreadyAsked(toolsCalled);
     const alreadyKnownViaTool = toolReturnedAlreadyKnown(toolsCalled);
 
+    // [WHY] override model prose when the tool already proved listing-known or already-asked
     if (alreadyKnownViaTool) {
       finalContent = alreadyKnownViaTool.reply;
       hasUnknown = false;
