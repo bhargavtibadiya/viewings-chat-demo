@@ -33,6 +33,12 @@ const variantIcon: Record<NonNullable<ToastItem['variant']>, React.ReactElement>
   default: <Info className="h-4 w-4 text-[var(--color-text-muted)]" />,
 };
 
+/**
+ * Provides transient notifications and renders them in a fixed viewport region.
+ *
+ * @param props - Application content and toast placement
+ * @returns The toast context provider and active notifications
+ */
 export function ToastProvider({
   children,
   position = 'top-right',
@@ -45,6 +51,7 @@ export function ToastProvider({
 
   const show = useCallback(
     (toast: Omit<ToastItem, 'id'>) => {
+      // [WHY] combines time and entropy so rapid notifications do not share a React key.
       const id = `toast-${Date.now()}-${Math.random()}`;
       const nextToast: ToastItem = { ...toast, id };
       setToasts((current) => [...current, nextToast]);

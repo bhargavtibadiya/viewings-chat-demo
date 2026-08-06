@@ -8,6 +8,12 @@ interface SkeletonProps {
   className?: string;
 }
 
+/**
+ * Renders a loading placeholder for a single element, text group, or card.
+ *
+ * @param props - Placeholder shape and sizing options
+ * @returns An animated loading placeholder
+ */
 export function Skeleton({
   variant = 'text',
   width,
