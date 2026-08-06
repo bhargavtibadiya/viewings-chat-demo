@@ -40,6 +40,12 @@ import { propertiesService } from '../properties/properties.service.js';
 
 const logger = createLogger('ChatService');
 
+/**
+ * Converts stored JSON into the supported chat-action shape.
+ *
+ * @param value - Persisted action JSON
+ * @returns Valid actions, or null when no valid actions are present
+ */
 function parseActions(value: Prisma.JsonValue | null): ChatAction[] | null {
   if (!Array.isArray(value)) {
     return null;
@@ -101,6 +107,14 @@ export class ChatService {
     };
   }
 
+  /**
+   * Returns a user's chat session for a property, creating it when needed.
+   *
+   * @param userId - ID of the session owner
+   * @param propertyId - ID of the property being discussed
+   * @returns The safe session representation
+   * @throws {ServiceError} if the property does not exist
+   */
   async getOrCreateSession(userId: string, propertyId: string): Promise<SafeChatSession> {
     const property = await prisma.property.findFirst({
       where: { id: propertyId, ...notDeleted() },
@@ -128,8 +142,9 @@ export class ChatService {
   }
 
   /**
-   * First-open welcome: if the session has no messages yet, persist a varied
-   * greeting as an assistant message so visitors see help immediately.
+   * Adds an opening greeting when a session has no messages.
+   *
+   * @param sessionId - ID of the session to initialize
    */
   private async ensureOpeningGreeting(sessionId: string): Promise<void> {
     await prisma.$transaction(async (tx) => {
@@ -159,6 +174,15 @@ export class ChatService {
     });
   }
 
+  /**
+   * Retrieves an owned session's messages using backwards cursor pagination.
+   *
+   * @param userId - ID of the session owner
+   * @param sessionId - ID of the session to read
+   * @param query - Pagination options
+   * @returns Messages and their pagination metadata
+   * @throws {ServiceError} if the session or cursor message is unavailable
+   */
   async getMessages(
     userId: string,
     sessionId: string,
@@ -166,7 +190,7 @@ export class ChatService {
   ): Promise<ChatMessagesResponse> {
     await this.verifySessionOwnership(userId, sessionId);
 
-    // Seed welcome on first fetch of an empty thread (covers sessions created before this feature).
+    // [NOTE] Backfills a greeting for sessions created before opening greetings were introduced.
     if (!query.before) {
       await this.ensureOpeningGreeting(sessionId);
     }
@@ -225,11 +249,28 @@ export class ChatService {
     };
   }
 
+  /**
+   * Retrieves the parsed memory for an owned chat session.
+   *
+   * @param userId - ID of the session owner
+   * @param sessionId - ID of the session to read
+   * @returns The session memory
+   * @throws {ServiceError} if the session is not owned by the user
+   */
   async getSessionMemory(userId: string, sessionId: string): Promise<SessionMemoryResponse> {
     const session = await this.verifySessionOwnership(userId, sessionId);
     return { memory: parseSessionMemory(session.contextMemory) };
   }
 
+  /**
+   * Persists a visitor message and generates its assistant response.
+   *
+   * @param userId - ID of the session owner
+   * @param sessionId - ID of the target chat session
+   * @param dto - Validated visitor message
+   * @returns The completed chat turn and agent metadata
+   * @throws {ServiceError} if the session or property is unavailable
+   */
   async postMessage(userId: string, sessionId: string, dto: PostMessageDtoType): Promise<ChatTurnResponse> {
     const session = await this.verifySessionOwnership(userId, sessionId);
 
@@ -346,6 +387,15 @@ export class ChatService {
     };
   }
 
+  /**
+   * Escalates a visitor question to the listing's lister.
+   *
+   * @param userId - ID of the session owner
+   * @param sessionId - ID of the target chat session
+   * @param dto - Validated lister question
+   * @returns The persisted escalation chat turn
+   * @throws {ServiceError} if the session or property is unavailable
+   */
   async askLister(userId: string, sessionId: string, dto: AskListerDtoType): Promise<ChatTurnResponse> {
     const session = await this.verifySessionOwnership(userId, sessionId);
 
@@ -457,6 +507,15 @@ export class ChatService {
     };
   }
 
+  /**
+   * Books a viewing slot and records the outcome in the conversation.
+   *
+   * @param userId - ID of the session owner
+   * @param sessionId - ID of the target chat session
+   * @param dto - Validated slot selection
+   * @returns The booking chat turn, including failure acknowledgement when applicable
+   * @throws {ServiceError} if the session or selected slot is unavailable
+   */
   async bookSlot(userId: string, sessionId: string, dto: BookSlotDtoType): Promise<ChatTurnResponse> {
     const session = await this.verifySessionOwnership(userId, sessionId);
 
@@ -504,7 +563,7 @@ export class ChatService {
             '\n\nThere are no free viewing times right now. Ask me to check another date.';
         }
       } catch {
-        // ignore availability lookup failure
+        // [NOTE] The original booking failure remains the actionable result if alternatives cannot load.
       }
 
       const assistantMessage = await prisma.chatMessage.create({
@@ -570,7 +629,7 @@ export class ChatService {
       },
     });
 
-    // Clear stale slot buttons from earlier assistant messages in this session.
+    // [WHY] Earlier slot buttons may now point to unavailable slots after a confirmed booking.
     const priorWithActions = await prisma.chatMessage.findMany({
       where: {
         sessionId,
@@ -636,6 +695,14 @@ export class ChatService {
     };
   }
 
+  /**
+   * Ensures a chat session belongs to the requesting user.
+   *
+   * @param userId - ID of the requesting user
+   * @param sessionId - ID of the session to verify
+   * @returns The owned session
+   * @throws {ServiceError} if no active owned session exists
+   */
   private async verifySessionOwnership(userId: string, sessionId: string): Promise<ChatSession> {
     const session = await prisma.chatSession.findFirst({
       where: { id: sessionId, userId, ...notDeleted() },
