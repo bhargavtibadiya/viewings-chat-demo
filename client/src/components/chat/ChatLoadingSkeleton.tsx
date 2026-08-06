@@ -1,5 +1,10 @@
 import { Skeleton } from '@/components/ui';
 
+/**
+ * Renders a placeholder transcript while a chat is loading.
+ *
+ * @returns The chat loading skeleton
+ */
 export function ChatLoadingSkeleton(): React.ReactElement {
   return (
     <div className="space-y-4 py-2" aria-busy="true" aria-label="Loading chat">

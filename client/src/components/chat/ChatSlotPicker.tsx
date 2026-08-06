@@ -24,6 +24,12 @@ function getPayloadString(action: IChatAction, key: string): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+/**
+ * Formats a booking action's timestamps for the marketplace timezone.
+ *
+ * @param action - Chat action containing the optional slot metadata
+ * @returns A display-ready date and optional time range
+ */
 function formatSlot(action: IChatAction): SlotDisplay {
   const startsAtValue = getPayloadString(action, 'startsAt');
   const endsAtValue = getPayloadString(action, 'endsAt');
@@ -61,12 +67,19 @@ function formatSlot(action: IChatAction): SlotDisplay {
   };
 }
 
+/**
+ * Presents booking actions from an assistant message as selectable viewing slots.
+ *
+ * @param props - Slot actions and booking state callbacks
+ * @returns Booking controls, or nothing when no valid slots exist
+ */
 export function ChatSlotPicker({
   actions,
   disabled = false,
   bookingSlotId = null,
   onBookSlot,
 }: ChatSlotPickerProps): React.ReactElement | null {
+  // [WHY] discard malformed actions so every displayed option has a bookable identifier.
   const slots = actions.filter((action) => action.type === 'book_slot' && getSlotId(action));
 
   if (slots.length === 0) {

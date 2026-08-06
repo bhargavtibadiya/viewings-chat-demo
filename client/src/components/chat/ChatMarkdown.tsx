@@ -6,7 +6,12 @@ interface ChatMarkdownProps {
   inverted?: boolean;
 }
 
-/** Map <u>…</u> to a marker link so ReactMarkdown can render underline without raw HTML. */
+/**
+ * Converts underline tags into a safe marker link for the markdown renderer.
+ *
+ * @param content - Assistant message content to normalize
+ * @returns Markdown content without raw underline HTML
+ */
 function prepareChatMarkdown(content: string): string {
   return content.replace(/<u>([\s\S]*?)<\/u>/gi, (_, inner: string) => {
     const safe = String(inner).replace(/\]/g, '\\]');
@@ -14,6 +19,12 @@ function prepareChatMarkdown(content: string): string {
   });
 }
 
+/**
+ * Renders assistant message markdown using the chat visual treatment.
+ *
+ * @param props - Markdown content and its color context
+ * @returns A sanitized, styled markdown message
+ */
 export function ChatMarkdown({ content, inverted = false }: ChatMarkdownProps): React.ReactElement {
   const prepared = prepareChatMarkdown(content);
 
@@ -80,6 +91,7 @@ export function ChatMarkdown({ content, inverted = false }: ChatMarkdownProps): 
               );
             }
 
+            // [SEC] external links open in an isolated browsing context.
             return (
               <a
                 href={href}
