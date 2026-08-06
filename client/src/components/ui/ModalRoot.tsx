@@ -18,6 +18,12 @@ const sizeClasses = {
   full: 'max-w-[95vw]',
 };
 
+/**
+ * Renders a configurable modal and manages its global keyboard and scroll effects.
+ *
+ * @param props - Visibility, dismissal behavior, and modal content
+ * @returns The modal overlay, or nothing while closed
+ */
 export function ModalRoot({
   open,
   onOpenChange,
@@ -32,6 +38,7 @@ export function ModalRoot({
   useEffect(() => {
     if (!open) return undefined;
 
+    // [WHY] restore the exact prior value because another view may have set body overflow.
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 

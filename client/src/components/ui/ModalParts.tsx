@@ -21,6 +21,12 @@ export function ModalHeader({ children, className }: ModalSectionProps): React.R
   return <div className={cn('mb-4 flex items-start justify-between gap-4', className)}>{children}</div>;
 }
 
+/**
+ * Renders a close action for a composed modal.
+ *
+ * @param props - Callback that closes the owning modal
+ * @returns A close button
+ */
 export function ModalCloseButton({ onClose }: { onClose: () => void }): React.ReactElement {
   return (
     <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">

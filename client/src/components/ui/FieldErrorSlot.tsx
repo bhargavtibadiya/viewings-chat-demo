@@ -7,6 +7,12 @@ interface FieldErrorSlotProps {
   reserveSpace?: boolean;
 }
 
+/**
+ * Reserves optional field-message space to avoid layout shifts during validation.
+ *
+ * @param props - Message content, severity, and space-reservation setting
+ * @returns A field message or visually hidden placeholder
+ */
 export function FieldErrorSlot({
   id,
   message,
