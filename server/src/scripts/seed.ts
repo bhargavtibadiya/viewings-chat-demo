@@ -6,6 +6,12 @@ import { createLogger } from '../utils/helpers/logger.js';
 
 const logger = createLogger('Seed');
 
+/**
+ * Seeds idempotent development users and listings, then closes the database connection.
+ *
+ * @returns Nothing
+ * @throws {Error} when a seed operation fails
+ */
 async function main(): Promise<void> {
   logger.info('Starting idempotent seed...');
 
@@ -21,6 +27,7 @@ async function main(): Promise<void> {
 main()
   .catch((error: unknown) => {
     logger.error('Seed failed', error);
+    // [WARN] a failed seed leaves the local dataset incomplete, so signal failure to CI and callers
     process.exit(1);
   })
   .finally(async () => {

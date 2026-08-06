@@ -18,13 +18,24 @@ import { sendSuccess } from './utils/helpers/response.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { createLogger } from './utils/helpers/logger.js';
 
+// ============================================================================
+// APPLICATION INITIALIZATION
+// Configures process-wide settings and builds the Express application instance
+// ============================================================================
+
 process.env.TZ = env.TZ;
 
 const logger = createLogger('Server');
 const app = express();
 
+// ============================================================================
+// GLOBAL MIDDLEWARE
+// Applies security, request parsing, observability, and abuse protection
+// ============================================================================
+
 app.use(helmet());
 
+// [WHY] deduplication keeps a repeated primary origin from expanding the allowlist
 const allowedOrigins = Array.from(
   new Set([env.APP_URL, ...env.CORS_ORIGINS]),
 );
@@ -32,6 +43,7 @@ const allowedOrigins = Array.from(
 app.use(
   cors({
     origin(origin, callback) {
+      // [WHY] non-browser clients omit Origin and are safe to admit through CORS
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
         return;
@@ -45,9 +57,26 @@ app.use(express.json({ limit: '1mb' }));
 app.use(requestLogger);
 app.use(generalLimiter);
 
+// ============================================================================
+// HEALTH CHECK
+// Exposes a lightweight readiness endpoint for uptime checks and deployments
+// ============================================================================
+
+/**
+ * Reports that the API process is available and identifies its configured timezone.
+ *
+ * @param _req - Incoming health-check request
+ * @param res - Express response used to return the service status
+ * @returns The standardized successful health response
+ */
 app.get(ROUTES.HEALTH, (_req, res) => {
   sendSuccess(res, 'OK', { status: 'healthy', timezone: env.TZ });
 });
+
+// ============================================================================
+// API ROUTES
+// Mounts each feature router beneath its versioned base path
+// ============================================================================
 
 app.use(ROUTES.AUTH.BASE, authRoutes);
 app.use(ROUTES.USERS.BASE, usersRoutes);
@@ -58,7 +87,13 @@ app.use(ROUTES.LISTER.BASE, listerRoutes);
 app.use(ROUTES.LEADS.BASE, leadsRoutes);
 app.use(ROUTES.DEMO.BASE, demoRoutes);
 
+// [WARN] this must follow route registration so it can handle downstream errors
 app.use(errorHandler);
+
+// ============================================================================
+// SERVER STARTUP
+// Begins accepting requests after middleware and routes are fully configured
+// ============================================================================
 
 app.listen(env.PORT, () => {
   logger.info(`Viewings chat API running on ${env.API_URL} (port ${env.PORT})`);
