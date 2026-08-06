@@ -27,7 +27,7 @@ export interface CreateQuestionResult {
   questionId: string;
   status: QuestionStatus;
   delivered: boolean;
-  /** True when a similar/exact OPEN escalation already exists for this session or user. */
+  // [NOTE] True when a similar or exact open escalation already exists for this visitor context.
   alreadyAsked?: boolean;
   questionText?: string;
 }

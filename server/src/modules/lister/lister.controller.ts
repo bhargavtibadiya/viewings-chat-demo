@@ -15,6 +15,14 @@ export class ListerController {
     this.listerService = new ListerService();
   }
 
+  /**
+   * Lists unanswered questions for the authenticated lister.
+   *
+   * @param req - Authenticated Express request
+   * @param res - Express response used to return questions
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   listQuestions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -29,6 +37,14 @@ export class ListerController {
     }
   };
 
+  /**
+   * Publishes the authenticated lister's answer to a question.
+   *
+   * @param req - Authenticated Express request containing answer details
+   * @param res - Express response used to return the approved answer
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   answerQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {

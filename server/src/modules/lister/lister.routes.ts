@@ -5,11 +5,7 @@ import { ROUTES } from '../../utils/constants/routes.js';
 
 const router = Router();
 
-/**
- * @route   GET /api/lister/questions
- * @desc    List unanswered questions for lister properties
- * @access  Protected (Lister)
- */
+// [NOTE] List unanswered questions for lister properties
 router.get(
   ROUTES.LISTER.LIST_QUESTIONS,
   authenticate,
@@ -17,11 +13,7 @@ router.get(
   listerController.listQuestions,
 );
 
-/**
- * @route   POST /api/lister/questions/:questionId/answer
- * @desc    Answer a lister question
- * @access  Protected (Lister)
- */
+// [NOTE] Answer a lister question
 router.post(
   ROUTES.LISTER.ANSWER_QUESTION,
   authenticate,
