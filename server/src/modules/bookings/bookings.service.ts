@@ -45,6 +45,14 @@ export class BookingsService {
     };
   }
 
+  /**
+   * Fills missing booking contact details from the authenticated user.
+   *
+   * @param userId - ID of the booking user
+   * @param dto - Validated booking request
+   * @returns A booking request with required contact details
+   * @throws {ServiceError} if the user does not exist
+   */
   async resolveContactFromUser(
     userId: string,
     dto: CreateBookingDtoType,
@@ -73,6 +81,14 @@ export class BookingsService {
     };
   }
 
+  /**
+   * Confirms a viewing booking, replacing another confirmed booking for the same property.
+   *
+   * @param userId - ID of the booking user
+   * @param dto - Validated booking request
+   * @returns The confirmed booking and any bookings it replaced
+   * @throws {ServiceError} if the slot is unavailable or the request is invalid
+   */
   async createBooking(userId: string, dto: CreateBookingDtoType): Promise<CreateBookingResult> {
     const resolved = await this.resolveContactFromUser(userId, dto);
 
@@ -88,7 +104,7 @@ export class BookingsService {
       throw createServiceError(404, 'Slot not found for this property');
     }
 
-    // Already confirmed on this exact slot - idempotent return (no duplicate).
+    // [WHY] Retrying the same booking must return the original confirmation without duplicating it.
     const existingOnSlot = await prisma.booking.findFirst({
       where: {
         userId,
@@ -113,7 +129,7 @@ export class BookingsService {
       throw createServiceError(409, 'This slot is no longer available');
     }
 
-    // Reschedule: cancel other confirmed bookings for this user on this property first.
+    // [WHY] A visitor can hold only one active viewing for a property at a time.
     const previousConfirmed = await prisma.booking.findMany({
       where: {
         userId,
@@ -184,6 +200,14 @@ export class BookingsService {
     };
   }
 
+  /**
+   * Cancels an owned booking and reopens its slot.
+   *
+   * @param userId - ID of the booking owner
+   * @param bookingId - ID of the booking to cancel
+   * @returns The cancelled booking
+   * @throws {ServiceError} if the booking is missing or already cancelled
+   */
   async cancelBooking(userId: string, bookingId: string): Promise<SafeBooking> {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, userId, ...notDeleted() },
@@ -216,6 +240,12 @@ export class BookingsService {
     return this.toSafeBooking(updated);
   }
 
+  /**
+   * Lists all non-deleted bookings belonging to a user.
+   *
+   * @param userId - ID of the booking owner
+   * @returns The user's bookings in reverse creation order
+   */
   async listMyBookings(userId: string): Promise<SafeBooking[]> {
     const bookings = await prisma.booking.findMany({
       where: { userId, ...notDeleted() },
@@ -226,6 +256,14 @@ export class BookingsService {
     return bookings.map((booking) => this.toSafeBooking(booking));
   }
 
+  /**
+   * Retrieves a booking owned by the requesting user.
+   *
+   * @param userId - ID of the booking owner
+   * @param bookingId - ID of the booking to retrieve
+   * @returns The requested booking
+   * @throws {ServiceError} if the booking is unavailable
+   */
   async getBookingById(userId: string, bookingId: string): Promise<SafeBooking> {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, userId, ...notDeleted() },
@@ -239,6 +277,13 @@ export class BookingsService {
     return this.toSafeBooking(booking);
   }
 
+  /**
+   * Creates a booking on behalf of an agent tool call.
+   *
+   * @param userId - ID of the booking user
+   * @param input - Validated booking input
+   * @returns The confirmed booking result
+   */
   async createBookingFromTool(
     userId: string,
     input: CreateBookingDtoType,
@@ -246,6 +291,13 @@ export class BookingsService {
     return this.createBooking(userId, input);
   }
 
+  /**
+   * Cancels a booking on behalf of an agent tool call.
+   *
+   * @param userId - ID of the booking owner
+   * @param bookingId - ID of the booking to cancel
+   * @returns The cancelled booking
+   */
   async cancelBookingFromTool(userId: string, bookingId: string): Promise<SafeBooking> {
     return this.cancelBooking(userId, bookingId);
   }
