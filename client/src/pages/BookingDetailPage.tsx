@@ -7,6 +7,11 @@ import { clearBookingDetail } from '@/store/bookings/bookings.slice';
 import { formatDateTimeNz } from '@/utils/helpers/propertyFormatters';
 import { useToast } from '@/components/ui';
 
+/**
+ * Displays one booking and lets the user cancel a confirmed viewing.
+ *
+ * @returns The booking-detail route content
+ */
 export function BookingDetailPage(): React.ReactElement {
   const { bookingId = '' } = useParams();
   const dispatch = useAppDispatch();
@@ -20,10 +25,16 @@ export function BookingDetailPage(): React.ReactElement {
     if (bookingId.length === 0) return undefined;
     dispatch(getBookingByIdThunk({ bookingId }));
     return () => {
+      // [WHY] discard the prior route's detail before another booking can render.
       dispatch(clearBookingDetail());
     };
   }, [bookingId, dispatch]);
 
+  /**
+   * Cancels the displayed booking and confirms the successful update.
+   *
+   * @returns A promise that settles after the cancellation request completes
+   */
   const handleCancel = async (): Promise<void> => {
     if (!booking) return;
     const result = await dispatch(cancelBookingThunk({ bookingId: booking.id }));
@@ -110,6 +121,12 @@ interface DetailProps {
   value: string;
 }
 
+/**
+ * Renders a labeled booking-detail value.
+ *
+ * @param props - Label and value to display
+ * @returns A description-list entry
+ */
 function Detail({ label, value }: DetailProps): React.ReactElement {
   return (
     <div>

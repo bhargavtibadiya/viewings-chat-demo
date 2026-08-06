@@ -5,6 +5,11 @@ import { useAppDispatch, useAppSelector } from '@/store/store';
 import { getBookingsThunk } from '@/store/bookings/bookings.thunk';
 import { formatDateTimeNz } from '@/utils/helpers/propertyFormatters';
 
+/**
+ * Lists the signed-in user's viewing bookings.
+ *
+ * @returns The bookings route content
+ */
 export function BookingsPage(): React.ReactElement {
   const dispatch = useAppDispatch();
   const bookings = useAppSelector((state) => state.bookings.bookings);
@@ -12,6 +17,7 @@ export function BookingsPage(): React.ReactElement {
   const hasRequested = useAppSelector((state) => state.bookings.hasRequestedBookings);
 
   useEffect(() => {
+    // [WHY] retain loaded bookings when revisiting this route during the same session.
     if (hasRequested || loading) return;
     dispatch(getBookingsThunk());
   }, [dispatch, hasRequested, loading]);
