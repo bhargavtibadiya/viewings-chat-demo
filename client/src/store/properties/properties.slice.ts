@@ -85,8 +85,7 @@ const propertiesSlice = createSlice({
         getAvailabilityLoading: false,
         availabilitySlots: [],
       }))
-      // A request made before the session was confirmed cannot be trusted, so every
-      // auth transition clears the cache and the "already requested" guard.
+      // [SEC] Clear cached listings after authentication changes because their access scope may differ.
       .addCase(loginThunk.fulfilled, () => initialState)
       .addCase(meThunk.rejected, () => initialState)
       .addCase(logout, () => initialState);

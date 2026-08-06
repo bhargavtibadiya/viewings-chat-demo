@@ -13,6 +13,17 @@ import type {
   IGetAvailabilityThunkResponse,
 } from '@/store/properties/properties.types';
 
+// ============================================================================
+// PROPERTY THUNKS
+// Retrieves listing search results, property details, and availability
+// ============================================================================
+
+/**
+ * Retrieves properties matching the optional search filters.
+ *
+ * @param data - Optional property search filters
+ * @returns A dispatchable action resolving with matching properties or an API error
+ */
 export const getPropertiesThunk = createAsyncThunk<
   IGetPropertiesThunkResponse,
   IGetPropertiesThunkPayload | void,
@@ -29,10 +40,17 @@ export const getPropertiesThunk = createAsyncThunk<
     }
   },
   {
+    // [PERF] Suppress duplicate search requests while the current search is pending.
     condition: (_, { getState }) => !getState().properties.getPropertiesLoading,
   },
 );
 
+/**
+ * Retrieves detailed information for a property.
+ *
+ * @param data - Property identifier
+ * @returns A dispatchable action resolving with property detail or an API error
+ */
 export const getPropertyByIdThunk = createAsyncThunk<
   IGetPropertyByIdThunkResponse,
   IGetPropertyByIdThunkPayload,
@@ -47,6 +65,12 @@ export const getPropertyByIdThunk = createAsyncThunk<
   }
 });
 
+/**
+ * Retrieves viewing availability for a property.
+ *
+ * @param data - Property identifier
+ * @returns A dispatchable action resolving with availability slots or an API error
+ */
 export const getAvailabilityThunk = createAsyncThunk<
   IGetAvailabilityThunkResponse,
   IGetAvailabilityThunkPayload,
