@@ -9,6 +9,12 @@ interface PropertyCardProps {
   property: IProperty;
 }
 
+/**
+ * Renders a marketplace listing with a direct path into its property chat.
+ *
+ * @param props - The listing data to summarize
+ * @returns A linked property card and chat action
+ */
 export function PropertyCard({ property }: PropertyCardProps): React.ReactElement {
   const navigate = useNavigate();
 

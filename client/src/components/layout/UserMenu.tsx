@@ -6,6 +6,11 @@ import { useAppDispatch, useAppSelector } from '@/store/store';
 import { logout } from '@/store/auth/auth.slice';
 import { setAuthToken } from '@/utils/api/axiosInstance';
 
+/**
+ * Renders the current user's role-aware account menu.
+ *
+ * @returns The account menu, or nothing until a user is available
+ */
 export function UserMenu(): React.ReactElement | null {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -24,12 +29,14 @@ export function UserMenu(): React.ReactElement | null {
       setOpen(false);
     };
 
+    // [WHY] listen on the document so clicks outside the menu close it consistently.
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [open]);
 
   if (!user) return null;
 
+  /** Clears local authentication state before returning the user to login. */
   const handleLogout = (): void => {
     dispatch(logout());
     setAuthToken(null);
