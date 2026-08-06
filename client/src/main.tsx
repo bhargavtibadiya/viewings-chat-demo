@@ -10,6 +10,7 @@ import '@/styles/globals.css';
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
+  // [WARN] Rendering without the host node would conceal a broken application shell.
   throw new Error('Root element not found');
 }
 

@@ -17,6 +17,11 @@ import { useSessionStatus } from '@/hooks/use-session-status';
 import { formatListingType } from '@/utils/helpers/propertyFormatters';
 import { getPropertiesThunk } from '@/store/properties/properties.thunk';
 
+/**
+ * Restores the authenticated profile after persisted state has rehydrated.
+ *
+ * @returns Nothing visible; renders null while initiating profile restoration
+ */
 function AuthBootstrap(): null {
   const dispatch = useAppDispatch();
   const token = useAppSelector((state) => state.auth.token);
@@ -30,6 +35,11 @@ function AuthBootstrap(): null {
   return null;
 }
 
+/**
+ * Renders authenticated routes and global property search controls.
+ *
+ * @returns The shared authenticated application layout
+ */
 function AuthenticatedLayout(): React.ReactElement {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -41,6 +51,7 @@ function AuthenticatedLayout(): React.ReactElement {
   useCommandPalette(() => setSearchOpen((current) => !current), true);
 
   useEffect(() => {
+    // [WHY] The command palette needs all properties before users can navigate from search.
     if (sessionStatus !== 'ready' || hasRequestedProperties) return;
     dispatch(getPropertiesThunk());
   }, [dispatch, hasRequestedProperties, sessionStatus]);
@@ -65,6 +76,11 @@ function AuthenticatedLayout(): React.ReactElement {
   );
 }
 
+/**
+ * Defines the application's public and authenticated browser routes.
+ *
+ * @returns The root browser router and route tree
+ */
 export function AppRouter(): React.ReactElement {
   return (
     <BrowserRouter>
