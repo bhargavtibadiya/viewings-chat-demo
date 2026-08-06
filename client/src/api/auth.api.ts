@@ -9,13 +9,18 @@ import type {
 
 export const authService = {
   /**
-   * @param data Email and password credentials
+   * Authenticates a user with email and password credentials.
+   *
+   * @param data - Email and password credentials
+   * @returns The API response containing the authenticated user and token
    */
   login: (data: ILoginThunkPayload) =>
     axiosInstance.post<ILoginThunkResponse>(ROUTES.AUTH.LOGIN, data),
 
   /**
-   * Fetch the current authenticated user profile
+   * Retrieves the current authenticated user's profile.
+   *
+   * @returns The API response containing the authenticated user
    */
   me: () => axiosInstance.get<IMeThunkResponse>(ROUTES.AUTH.ME),
 };

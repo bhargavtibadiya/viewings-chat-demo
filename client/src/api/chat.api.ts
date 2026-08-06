@@ -15,7 +15,10 @@ import type {
 
 export const chatService = {
   /**
-   * @param data Property id to get or create a chat session
+   * Retrieves or creates the chat session for a property.
+   *
+   * @param data - Property identifier
+   * @returns The API response containing the chat session
    */
   getSession: (data: IGetSessionThunkPayload) => {
     const url = replaceRouteParam(ROUTES.CHAT.SESSION_BY_PROPERTY, ':propertyId', data.propertyId);
@@ -23,7 +26,10 @@ export const chatService = {
   },
 
   /**
-   * @param data Session id for message history
+   * Retrieves a page of messages from a chat session.
+   *
+   * @param data - Session identifier and optional pagination parameters
+   * @returns The API response containing messages and pagination metadata
    */
   getMessages: (data: IGetMessagesThunkPayload) => {
     const url = replaceRouteParam(ROUTES.CHAT.MESSAGES, ':sessionId', data.sessionId);
@@ -38,7 +44,10 @@ export const chatService = {
   },
 
   /**
-   * @param data Session id and message content
+   * Sends a user message to a chat session.
+   *
+   * @param data - Session identifier and message content
+   * @returns The API response containing the completed chat turn
    */
   sendMessage: (data: ISendMessageThunkPayload) => {
     const url = replaceRouteParam(ROUTES.CHAT.MESSAGES, ':sessionId', data.sessionId);
@@ -46,7 +55,10 @@ export const chatService = {
   },
 
   /**
-   * @param data Session id and question to escalate to the lister
+   * Escalates a question from a chat session to the lister.
+   *
+   * @param data - Session identifier, question, and optional attributes
+   * @returns The API response containing the completed chat turn
    */
   askLister: (data: IAskListerThunkPayload) => {
     const url = replaceRouteParam(ROUTES.CHAT.ASK_LISTER, ':sessionId', data.sessionId);
@@ -57,7 +69,10 @@ export const chatService = {
   },
 
   /**
-   * @param data Session id and availability slot to book from chat
+   * Books an availability slot from a chat session.
+   *
+   * @param data - Session and availability slot identifiers
+   * @returns The API response containing the completed chat turn
    */
   bookSlot: (data: IBookSlotThunkPayload) => {
     const url = replaceRouteParam(ROUTES.CHAT.BOOK_SLOT, ':sessionId', data.sessionId);
