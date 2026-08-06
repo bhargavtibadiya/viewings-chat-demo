@@ -5,8 +5,8 @@ Use this for live demos. These cases match **implemented** behaviour only (prope
 **How to run:** open one listing chat → follow each row in order when a step depends on the previous one → tick Pass/Fail.
 
 | # | Feature shown | What you type / do | Expected (pass if…) |
-|---|----------------|--------------------|---------------------|
-| 1 | **Greeting (first open)** | `Hi` as the first message in a new session | Full welcome once (ask about price, features, availability, viewing). Not a restart loop. |
+| --- | ---------------- | -------------------- | --------------------- |
+| 1 | **Greeting (first open)** | Open a property chat with **no prior messages** (refresh if needed) | A welcome appears automatically (varies by session; often names the listing). Mentions help with details / viewing. |
 | 2 | **Greeting (mid-session)** | After some Q&A, send `Hello` again | Short “Hi again…” style ack. Does **not** repeat the full opening greeting. |
 | 3 | **Listing fact (beds)** | `How many bedrooms does this property have?` | Correct bedroom count from listing. No lister ask. Key number highlighted (bold). |
 | 4 | **Listing fact (rent/price)** | Rental: `What is the weekly rent?` · Sale: `What is the asking price?` | Correct money figure from tools. Money **bold**. No invented amount. |
