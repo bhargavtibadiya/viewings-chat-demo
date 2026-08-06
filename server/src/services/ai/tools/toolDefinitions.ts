@@ -5,7 +5,8 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_property',
-      description: 'Get structured facts and attributes for a property',
+      description:
+        'Get structured facts and attributes for a property (furnishing, outdoor_space, fencing, pets_policy, ensuite, heating, insulation, accessibility, step_free_access, rent, bond, etc.). Always call this before answering attribute questions.',
       parameters: {
         type: 'object',
         properties: {
