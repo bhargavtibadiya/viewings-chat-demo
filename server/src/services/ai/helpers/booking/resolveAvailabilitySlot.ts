@@ -1,6 +1,12 @@
-import { formatNzDateTime } from '../../../utils/helpers/date.js';
-import type { SafeAvailabilitySlot } from '../../../modules/properties/types/properties.types.js';
+import { formatNzDateTime } from '../../../../utils/helpers/date.js';
+import type { SafeAvailabilitySlot } from '../../../../modules/properties/types/properties.types.js';
 
+/**
+ * Normalizes slot text for fuzzy label comparison (dashes, ordinals, whitespace).
+ *
+ * @param value - Raw slot label or formatted datetime string
+ * @returns Lowercased, collapsed comparison key
+ */
 function normalizeSlotText(value: string): string {
   return value
     .toLowerCase()
@@ -10,7 +16,13 @@ function normalizeSlotText(value: string): string {
     .trim();
 }
 
-/** Match a free slot by id, ISO start time, or human label from get_availability. */
+/**
+ * Matches a free slot by id, ISO start time, or human label from get_availability.
+ *
+ * @param slots - Availability slots for the property (booked ones are skipped)
+ * @param options - Match keys: slotId, preferredStartsAt, and/or slotLabel
+ * @returns The first matching free slot, or null when none match
+ */
 export function resolveAvailabilitySlot(
   slots: SafeAvailabilitySlot[],
   options: {
@@ -31,6 +43,7 @@ export function resolveAvailabilitySlot(
   if (options.preferredStartsAt) {
     const preferredMs = Date.parse(options.preferredStartsAt);
     if (!Number.isNaN(preferredMs)) {
+      // [WHY] ±60s tolerance covers minor ISO / timezone rounding between client and API
       const byStart = freeSlots.find((slot) => {
         const slotMs = Date.parse(slot.startsAt);
         return !Number.isNaN(slotMs) && Math.abs(slotMs - preferredMs) < 60_000;
@@ -53,7 +66,7 @@ export function resolveAvailabilitySlot(
         return byLabel;
       }
 
-      // Looser match: weekday + time fragments (e.g. "sunday" + "5:00")
+      // [WHY] users often say "sunday 5:00" without the full NZ datetime label
       const byLoose = freeSlots.find((slot) => {
         const startsLabel = normalizeSlotText(formatNzDateTime(new Date(slot.startsAt)));
         const weekday = startsLabel.split(' ')[0] ?? '';
