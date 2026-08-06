@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { dedupeRepeatedContent, polishAssistantContent } from './responseQuality.js';
+import {
+  dedupeRepeatedContent,
+  polishAssistantContent,
+  toneDownExcessBold,
+} from './responseQuality.js';
 
 describe('responseQuality', () => {
   it('removes duplicated sentences', () => {
@@ -16,6 +20,24 @@ describe('responseQuality', () => {
     assert.equal(output, 'Pets are not allowed.\n\nAsk about a viewing.');
   });
 
+  it('preserves markdown bullet lists', () => {
+    const input = [
+      'Northcote Point Home is a 3-bedroom sale property asking **$1,750,000**.',
+      '',
+      'Key features:',
+      '- Harbour views',
+      '- Established terraced gardens',
+      '- 2 parking spaces',
+      '- Heat pump',
+      '- Built in 1910',
+    ].join('\n');
+
+    const output = polishAssistantContent(input);
+    assert.ok(output.includes('- Harbour views'));
+    assert.ok(output.includes('- Heat pump'));
+    assert.ok(output.includes('\n- '));
+  });
+
   it('polishAssistantContent keeps unique content', () => {
     const input = 'There are 2 bedrooms.\n\nThere are 2 bedrooms.';
     assert.equal(polishAssistantContent(input), 'There are 2 bedrooms.');
@@ -27,5 +49,14 @@ describe('responseQuality', () => {
       polishAssistantContent(input),
       'Weekly rent is $650 - bond is four weeks.',
     );
+  });
+
+  it('tones down excess bold', () => {
+    const input =
+      '**A** is a **3-bed** home at **2 Beach Road** asking **$1,750,000** with **2 parks**.';
+    const output = toneDownExcessBold(input, 3);
+    const boldCount = (output.match(/\*\*/g) ?? []).length / 2;
+    assert.equal(boldCount, 3);
+    assert.ok(output.includes('$1,750,000') || output.includes('**$1,750,000**'));
   });
 });
