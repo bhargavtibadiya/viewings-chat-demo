@@ -11,7 +11,10 @@ import type {
 
 export const propertiesService = {
   /**
-   * @param data Optional search and filter params
+   * Retrieves properties matching the optional search filters.
+   *
+   * @param data - Optional search and filter parameters
+   * @returns The API response containing matching properties
    */
   getProperties: (data?: IGetPropertiesThunkPayload) => {
     const params: Record<string, string | number> = {};
@@ -26,7 +29,10 @@ export const propertiesService = {
   },
 
   /**
-   * @param data Property id
+   * Retrieves detailed information for one property.
+   *
+   * @param data - Property identifier
+   * @returns The API response containing the property detail
    */
   getPropertyById: (data: IGetPropertyByIdThunkPayload) => {
     const url = replaceRouteParam(ROUTES.PROPERTIES.BY_ID, ':id', data.propertyId);
@@ -34,7 +40,10 @@ export const propertiesService = {
   },
 
   /**
-   * @param data Property id for availability lookup
+   * Retrieves viewing availability for one property.
+   *
+   * @param data - Property identifier
+   * @returns The API response containing available slots
    */
   getAvailability: (data: IGetAvailabilityThunkPayload) => {
     const url = replaceRouteParam(ROUTES.PROPERTIES.AVAILABILITY, ':id', data.propertyId);
