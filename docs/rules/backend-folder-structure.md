@@ -252,8 +252,11 @@ modules/[feature]/
 | `pagination/` | Reusable pagination utility |
 | `rate-limit/` | Express rate limiter setup |
 | `swagger/` | API documentation generation |
+| `ai/` | Chat agent: providers, loop, tools, memory, policies, helpers |
 
-**There is no single required internal structure** for services — each folder is organized by its own domain needs. The only rule is: every service folder must have an `index.ts` that exports its public API. Internal files are not imported directly from outside the service folder.
+**There is no single required internal structure** for most services — each folder is organized by its own domain needs. The only rule is: every service folder must have an `index.ts` that exports its public API. Internal files are not imported directly from outside the service folder.
+
+**Exception — `services/ai/`:** use the dedicated layout in [`ai-service-structure.md`](./ai-service-structure.md). AI unit tests live under `src/tests/ai/`, not inside `services/ai/`.
 
 **Queue structure (BullMQ pattern):**
 ```
