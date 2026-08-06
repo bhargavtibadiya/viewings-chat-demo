@@ -37,4 +37,6 @@ export interface BookingDetailResponse {
 export interface CreateBookingResult {
   booking: SafeBooking;
   confirmationMessage: string;
+  /** Prior confirmed bookings for this user+property that were cancelled as part of a reschedule. */
+  replacedBookingIds?: string[];
 }

@@ -88,11 +88,57 @@ export class BookingsService {
       throw createServiceError(404, 'Slot not found for this property');
     }
 
+    // Already confirmed on this exact slot - idempotent return (no duplicate).
+    const existingOnSlot = await prisma.booking.findFirst({
+      where: {
+        userId,
+        propertyId: resolved.propertyId,
+        slotId: resolved.slotId,
+        status: 'CONFIRMED',
+        ...notDeleted(),
+      },
+      include: this.bookingInclude(),
+    });
+
+    if (existingOnSlot) {
+      const safeExisting = this.toSafeBooking(existingOnSlot);
+      return {
+        booking: safeExisting,
+        confirmationMessage: `Your viewing is already confirmed for ${formatNzDateTime(existingOnSlot.slot.startsAt)} at ${existingOnSlot.property.suburb}. Reference: ${existingOnSlot.id}`,
+        replacedBookingIds: [],
+      };
+    }
+
     if (slot.isBooked) {
       throw createServiceError(409, 'This slot is no longer available');
     }
 
+    // Reschedule: cancel other confirmed bookings for this user on this property first.
+    const previousConfirmed = await prisma.booking.findMany({
+      where: {
+        userId,
+        propertyId: resolved.propertyId,
+        status: 'CONFIRMED',
+        ...notDeleted(),
+      },
+      include: this.bookingInclude(),
+    });
+
     const booking = await prisma.$transaction(async (tx) => {
+      const replacedIds: string[] = [];
+
+      for (const previous of previousConfirmed) {
+        await tx.booking.update({
+          where: { id: previous.id },
+          data: { status: 'CANCELLED' },
+        });
+        await tx.availabilitySlot.update({
+          where: { id: previous.slotId },
+          data: { isBooked: false },
+        });
+        replacedIds.push(previous.id);
+      }
+
       const lockedSlot = await tx.availabilitySlot.findFirst({
         where: { id: resolved.slotId, isBooked: false, ...notDeleted() },
       });
@@ -119,13 +165,23 @@ export class BookingsService {
         data: { isBooked: true },
       });
 
-      return created;
+      return { created, replacedIds };
     });
 
-    const safeBooking = this.toSafeBooking(booking);
-    const confirmationMessage = `Your viewing is confirmed for ${formatNzDateTime(booking.slot.startsAt)} at ${booking.property.suburb}. Reference: ${booking.id}`;
+    const safeBooking = this.toSafeBooking(booking.created);
+    const when = formatNzDateTime(booking.created.slot.startsAt);
+    const suburb = booking.created.property.suburb;
 
-    return { booking: safeBooking, confirmationMessage };
+    const confirmationMessage =
+      booking.replacedIds.length > 0
+        ? `Your viewing was moved to ${when} at ${suburb}. Your previous booking for this property was cancelled. Reference: ${booking.created.id}`
+        : `Your viewing is confirmed for ${when} at ${suburb}. Reference: ${booking.created.id}`;
+
+    return {
+      booking: safeBooking,
+      confirmationMessage,
+      replacedBookingIds: booking.replacedIds,
+    };
   }
 
   async cancelBooking(userId: string, bookingId: string): Promise<SafeBooking> {
