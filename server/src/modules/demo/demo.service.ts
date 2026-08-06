@@ -1,7 +1,7 @@
 import type { Prisma } from '../../generated/client.js';
 import prisma from '../../config/prisma.js';
 import { env } from '../../config/env.js';
-import { getOpenAIModel } from '../../services/ai/openai.client.js';
+import { getOpenAIModel } from '../../services/ai/index.js';
 import { createServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';
 import { isRecord } from '../../utils/helpers/json.js';

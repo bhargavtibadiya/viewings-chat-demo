@@ -7,12 +7,10 @@ import {
   parseSessionMemory,
   sessionMemoryToJson,
   upsertMemoryFact,
-} from '../../services/ai/tools/sessionMemory.js';
-import { parseListerAnswer } from '../../services/ai/helpers/parseListerAnswer.js';
-import {
+  parseListerAnswer,
   findSimilarOpenQuestion,
-  type OpenListerQuestionCandidate,
-} from '../../services/ai/helpers/openListerQuestions.js';
+} from '../../services/ai/index.js';
+import type { OpenListerQuestionCandidate } from '../../services/ai/index.js';
 import type { AnswerQuestionDtoType, CreateQuestionInput } from './dto/lister.dto.js';
 import type {
   AnswerQuestionResult,
