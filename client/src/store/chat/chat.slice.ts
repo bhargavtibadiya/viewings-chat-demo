@@ -46,7 +46,19 @@ function mergeMessagesByCreatedAt(messages: IChatMessage[]): IChatMessage[] {
   for (const message of messages) {
     byId.set(message.id, message);
   }
-  return Array.from(byId.values()).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  return Array.from(byId.values()).sort((a, b) => {
+    const byTime = a.createdAt.localeCompare(b.createdAt);
+    if (byTime !== 0) {
+      return byTime;
+    }
+    // Same timestamp: always show USER before ASSISTANT.
+    if (a.role !== b.role) {
+      if (a.role === 'USER') return -1;
+      if (b.role === 'USER') return 1;
+    }
+    return a.id.localeCompare(b.id);
+  });
 }
 
 function createPendingUserMessage(sessionId: string, content: string): IChatMessage {
@@ -58,6 +70,7 @@ function createPendingUserMessage(sessionId: string, content: string): IChatMess
     answerStatus: null,
     actions: null,
     metadata: null,
+    // Far-future-safe: keep pending at "now" but fulfilled path replaces with server timestamps.
     createdAt: new Date().toISOString(),
   };
 }
@@ -167,9 +180,17 @@ const chatSlice = createSlice({
         const fetchKey = getMessagesFetchKey(before);
         const incoming = action.payload.data.messages;
         const pagination = action.payload.data.pagination;
+
+        // Keep optimistic pending user bubbles while a send is in flight so a
+        // background refresh cannot drop/reorder the active turn.
+        const pendingWhileSending =
+          state.sendMessageLoading && !before
+            ? state.messages.filter((message) => isPendingUserMessage(message))
+            : [];
+
         const merged = before
           ? mergeMessagesByCreatedAt([...incoming, ...state.messages])
-          : mergeMessagesByCreatedAt(incoming);
+          : mergeMessagesByCreatedAt([...incoming, ...pendingWhileSending]);
 
         return {
           ...state,
@@ -196,7 +217,7 @@ const chatSlice = createSlice({
       .addCase(sendMessageThunk.pending, (state, action) => {
         const sessionId = action.meta.arg.sessionId;
         const pendingUserMessage = createPendingUserMessage(sessionId, action.meta.arg.content);
-        const messages = [...state.messages, pendingUserMessage];
+        const messages = mergeMessagesByCreatedAt([...state.messages, pendingUserMessage]);
 
         return {
           ...state,
@@ -213,12 +234,34 @@ const chatSlice = createSlice({
       })
       .addCase(sendMessageThunk.fulfilled, (state, action) => {
         const sessionId = action.meta.arg.sessionId;
-        const messages = [...state.messages, action.payload.data.message];
+        const withoutPending = state.messages.filter((message) => !isPendingUserMessage(message));
+        const assistantMessage = action.payload.data.message;
+        const userMessage =
+          action.payload.data.userMessage ??
+          ({
+            id: `local-user-${assistantMessage.id}`,
+            sessionId,
+            role: 'USER' as const,
+            content: action.meta.arg.content,
+            answerStatus: null,
+            actions: null,
+            metadata: null,
+            // Ensure USER sorts before ASSISTANT even if clocks match.
+            createdAt: new Date(
+              Math.max(0, new Date(assistantMessage.createdAt).getTime() - 1),
+            ).toISOString(),
+          } satisfies IChatMessage);
+
+        const messages = mergeMessagesByCreatedAt([
+          ...withoutPending,
+          userMessage,
+          assistantMessage,
+        ]);
         const pagination = state.messagesPagination
           ? {
               ...state.messagesPagination,
               total: state.messagesPagination.total + 2,
-              newestMessageId: action.payload.data.message.id,
+              newestMessageId: assistantMessage.id,
             }
           : state.messagesPagination;
 

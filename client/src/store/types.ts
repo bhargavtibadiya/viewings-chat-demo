@@ -114,6 +114,7 @@ export interface IChatDebugInfo {
 
 export interface IChatTurnResponse {
   message: IChatMessage;
+  userMessage?: IChatMessage;
   answer_status: AnswerStatus;
   facts: IChatFact[];
   actions: IChatAction[];
