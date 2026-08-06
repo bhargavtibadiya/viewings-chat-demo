@@ -20,6 +20,14 @@ export class ChatController {
     this.chatService = new ChatService();
   }
 
+  /**
+   * Returns or creates a chat session for an authenticated visitor and property.
+   *
+   * @param req - Authenticated Express request containing the property ID
+   * @param res - Express response used to return the session
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   getOrCreateSession = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -41,6 +49,14 @@ export class ChatController {
     }
   };
 
+  /**
+   * Returns a paginated page of messages from an owned chat session.
+   *
+   * @param req - Authenticated Express request containing session and cursor data
+   * @param res - Express response used to return messages
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   getMessages = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -71,6 +87,14 @@ export class ChatController {
     }
   };
 
+  /**
+   * Returns parsed memory for an owned chat session.
+   *
+   * @param req - Authenticated Express request containing the session ID
+   * @param res - Express response used to return session memory
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   getSessionMemory = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -91,6 +115,14 @@ export class ChatController {
     }
   };
 
+  /**
+   * Adds a visitor message and returns the generated assistant turn.
+   *
+   * @param req - Authenticated Express request containing message content
+   * @param res - Express response used to return the chat turn
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   postMessage = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -129,6 +161,14 @@ export class ChatController {
     }
   };
 
+  /**
+   * Escalates an authenticated visitor's question to the lister.
+   *
+   * @param req - Authenticated Express request containing escalation details
+   * @param res - Express response used to return the chat turn
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   askLister = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -161,6 +201,14 @@ export class ChatController {
     }
   };
 
+  /**
+   * Books a selected viewing slot through an owned chat session.
+   *
+   * @param req - Authenticated Express request containing the slot selection
+   * @param res - Express response used to return the booking turn
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   bookSlot = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {

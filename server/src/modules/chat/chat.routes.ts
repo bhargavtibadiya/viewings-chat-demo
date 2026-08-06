@@ -6,44 +6,28 @@ import { chatLimiter } from '../../services/rate-limit/index.js';
 
 const router = Router();
 
-/**
- * @route   GET /api/chat/sessions/:propertyId
- * @desc    Get or create chat session for user and property
- * @access  Protected
- */
+// [NOTE] Get or create chat session for user and property
 router.get(
   ROUTES.CHAT.GET_OR_CREATE_SESSION,
   authenticate,
   chatController.getOrCreateSession,
 );
 
-/**
- * @route   GET /api/chat/sessions/:sessionId/messages
- * @desc    List chat messages for a session
- * @access  Protected
- */
+// [NOTE] List chat messages for a session
 router.get(
   ROUTES.CHAT.GET_MESSAGES,
   authenticate,
   chatController.getMessages,
 );
 
-/**
- * @route   GET /api/chat/sessions/:sessionId/memory
- * @desc    Read session context memory
- * @access  Protected
- */
+// [NOTE] Read session context memory
 router.get(
   ROUTES.CHAT.GET_SESSION_MEMORY,
   authenticate,
   chatController.getSessionMemory,
 );
 
-/**
- * @route   POST /api/chat/sessions/:sessionId/messages
- * @desc    Post a user message and receive full assistant JSON turn
- * @access  Protected
- */
+// [NOTE] Post a user message and receive full assistant JSON turn
 router.post(
   ROUTES.CHAT.POST_MESSAGE,
   authenticate,
@@ -51,11 +35,7 @@ router.post(
   chatController.postMessage,
 );
 
-/**
- * @route   POST /api/chat/sessions/:sessionId/ask-lister
- * @desc    Escalate a question to the property lister
- * @access  Protected
- */
+// [NOTE] Escalate a question to the property lister
 router.post(
   ROUTES.CHAT.ASK_LISTER,
   authenticate,
@@ -63,11 +43,7 @@ router.post(
   chatController.askLister,
 );
 
-/**
- * @route   POST /api/chat/sessions/:sessionId/book
- * @desc    Book a viewing slot from chat using the authenticated user profile
- * @access  Protected
- */
+// [NOTE] Book a viewing slot from chat using the authenticated user profile
 router.post(
   ROUTES.CHAT.BOOK_SLOT,
   authenticate,
