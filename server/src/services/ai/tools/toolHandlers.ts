@@ -20,6 +20,10 @@ import {
 import { buildMemoryToolAttributes } from '../helpers/memoryAttributes.js';
 import { enrichListerQuestion } from '../helpers/enrichListerQuestion.js';
 import { resolveAvailabilitySlot } from '../helpers/resolveAvailabilitySlot.js';
+import {
+  findKnownListingAnswers,
+  formatAlreadyKnownListerReply,
+} from '../helpers/knownListingAnswers.js';
 import { sanitizePropertyDetailForListingType } from '../policies/listingTypePolicy.js';
 import { EMPTY_SLOTS_HINT } from '../policies/scopeGuard.js';
 import type { AgentContext, SessionMemory } from '../types/ai.types.js';
@@ -404,13 +408,48 @@ export class ToolHandlers {
       );
     }
 
+    const canonicalAttributes = getStringArrayArg(args, 'canonical_attributes');
+
+    // Hard guard: never escalate topics the listing already answers.
+    try {
+      const property = await propertiesService.getPropertyForTools(propertyId);
+      const sanitized = sanitizePropertyDetailForListingType({
+        ...property,
+        listingType: context.listingType,
+      });
+      const knownFacts = findKnownListingAnswers({
+        property: sanitized,
+        questionText,
+        canonicalAttributes,
+      });
+
+      if (knownFacts.length > 0) {
+        logger.info(
+          `Blocked lister escalation; listing already has facts sessionId=${context.sessionId} attrs=${knownFacts.map((fact) => fact.attribute).join(',')}`,
+        );
+        return JSON.stringify({
+          alreadyKnown: true,
+          escalated: false,
+          facts: knownFacts,
+          questionText,
+          message:
+            'Do NOT ask the lister. The listing already has this information. Tell the user the value(s) from facts and that there is no need to escalate.',
+          reply: formatAlreadyKnownListerReply(knownFacts),
+        });
+      }
+    } catch (error) {
+      logger.warn(
+        `Could not check known listing answers before escalation: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
+
     const result = await listerService.createQuestion({
       propertyId,
       sessionId: context.sessionId,
       userId: context.userId,
       questionText,
       resolvedIntent: getStringArg(args, 'resolved_intent'),
-      canonicalAttributes: getStringArrayArg(args, 'canonical_attributes'),
+      canonicalAttributes,
     });
 
     if (result.alreadyAsked) {

@@ -96,7 +96,7 @@ export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'send_question_to_lister',
       description:
-        'Escalate an unanswered question to the property lister. question_text must be a clear standalone question a lister can answer without chat history (never bare follow-ups like "why" or "ok"). If a similar OPEN question already exists, returns alreadyAsked=true — tell the user you already asked and will relay the answer; do not claim you sent a new question.',
+        'Escalate an unanswered question to the property lister ONLY when get_property does not already have the answer. If the listing already has the fact (e.g. floor area), do not call this - answer from listing data. question_text must be a clear standalone question. If a similar OPEN question already exists, returns alreadyAsked=true. If listing data already answers the topic, returns alreadyKnown=true with facts - tell the user those values and do not claim you asked the lister.',
       parameters: {
         type: 'object',
         properties: {
