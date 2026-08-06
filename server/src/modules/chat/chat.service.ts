@@ -337,6 +337,7 @@ export class ChatService {
 
     return {
       message: this.toSafeMessage(assistantMessage),
+      userMessage: this.toSafeMessage(userMessage),
       answer_status: agentResult.answerStatus,
       facts: agentResult.facts,
       actions: agentResult.actions,
@@ -621,6 +622,7 @@ export class ChatService {
 
     return {
       message: this.toSafeMessage(assistantMessage),
+      userMessage: this.toSafeMessage(userMessage),
       answer_status: 'VERIFIED',
       facts: [],
       actions: [],

@@ -35,6 +35,8 @@ export interface ChatMessagesResponse {
 
 export interface ChatTurnResponse {
   message: SafeChatMessage;
+  /** User turn for this response (present for postMessage / bookSlot). */
+  userMessage?: SafeChatMessage;
   answer_status: AnswerStatus;
   facts: ChatFact[];
   actions: ChatAction[];
