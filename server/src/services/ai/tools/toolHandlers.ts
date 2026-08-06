@@ -16,14 +16,14 @@ import {
   setActiveBookingPref,
   setPreferredDatePref,
   upsertMemoryFact,
-} from './sessionMemory.js';
-import { buildMemoryToolAttributes } from '../helpers/memoryAttributes.js';
-import { enrichListerQuestion } from '../helpers/enrichListerQuestion.js';
-import { resolveAvailabilitySlot } from '../helpers/resolveAvailabilitySlot.js';
+} from '../memory/sessionMemory.js';
+import { buildMemoryToolAttributes } from '../memory/memoryAttributes.js';
+import { enrichListerQuestion } from '../helpers/lister/enrichListerQuestion.js';
+import { resolveAvailabilitySlot } from '../helpers/booking/resolveAvailabilitySlot.js';
 import {
   findKnownListingAnswers,
   formatAlreadyKnownListerReply,
-} from '../helpers/knownListingAnswers.js';
+} from '../helpers/lister/knownListingAnswers.js';
 import { sanitizePropertyDetailForListingType } from '../policies/listingTypePolicy.js';
 import { EMPTY_SLOTS_HINT } from '../policies/scopeGuard.js';
 import type { AgentContext, SessionMemory } from '../types/ai.types.js';
@@ -32,7 +32,18 @@ import { ServiceError } from '../../../utils/helpers/serviceError.js';
 
 const logger = createLogger('ToolHandlers');
 
+/**
+ * Dispatches OpenAI tool calls to domain services and returns JSON strings for the model.
+ */
 export class ToolHandlers {
+  /**
+   * Parses tool arguments and routes to the matching handler.
+   *
+   * @param toolName - Function name from the model tool call
+   * @param rawArguments - JSON argument string from the model
+   * @param context - Session, user, and property context for the turn
+   * @returns JSON string result (success payload or structured error)
+   */
   async executeTool(
     toolName: string,
     rawArguments: string,
@@ -77,6 +88,7 @@ export class ToolHandlers {
           return JSON.stringify({ error: `Unknown tool: ${toolName}` });
       }
     } catch (error) {
+      // [WHY] ServiceError is a controlled domain failure — surface it to the model, do not throw
       if (error instanceof ServiceError) {
         logger.warn(`Tool ${toolName} failed: ${error.message}`);
         return JSON.stringify({
@@ -93,8 +105,16 @@ export class ToolHandlers {
     }
   }
 
+  /**
+   * Always binds tools to the session property; ignores model-supplied cross-listing ids.
+   *
+   * @param args - Parsed tool arguments that may include property_id
+   * @param context - Active agent context
+   * @returns Session property id
+   */
   private resolvePropertyId(args: Record<string, unknown>, context: AgentContext): string {
     const requested = getStringArg(args, 'property_id');
+    // [WARN] never honour a different property_id — session is scoped to one listing
     if (requested && requested !== context.propertyId) {
       logger.warn(
         `Ignoring tool property_id=${requested}; using session propertyId=${context.propertyId}`,
@@ -103,6 +123,12 @@ export class ToolHandlers {
     return context.propertyId;
   }
 
+  /**
+   * Loads and parses context memory for a chat session.
+   *
+   * @param sessionId - Chat session id
+   * @returns Session id plus parsed memory, or null if missing
+   */
   private async loadSessionMemory(sessionId: string): Promise<{
     sessionId: string;
     memory: SessionMemory;
@@ -116,12 +142,24 @@ export class ToolHandlers {
     return { sessionId: session.id, memory: parseSessionMemory(session.contextMemory) };
   }
 
+  /**
+   * Persists session memory JSON back to the chat session row.
+   *
+   * @param sessionId - Chat session id
+   * @param memory - Updated memory object
+   * @returns Nothing
+   */
   private async saveSessionMemory(sessionId: string, memory: SessionMemory): Promise<void> {
     await prisma.chatSession.update({
       where: { id: sessionId },
       data: { contextMemory: sessionMemoryToJson(memory) },
     });
   }
+
+  // ============================================================================
+  // PROPERTY TOOLS
+  // Listing facts and cross-listing search
+  // ============================================================================
 
   private async getProperty(propertyId: string, context: AgentContext): Promise<string> {
     const property = await propertiesService.getPropertyForTools(propertyId);
@@ -130,7 +168,7 @@ export class ToolHandlers {
       listingType: context.listingType,
     });
 
-    // Persist core pricing/facts so later turns stay consistent.
+    // [WHY] persist core pricing/facts so later turns stay consistent without re-fetching
     const loaded = await this.loadSessionMemory(context.sessionId);
     if (loaded) {
       let memory = loaded.memory;
@@ -177,6 +215,11 @@ export class ToolHandlers {
     return JSON.stringify({ listings: results });
   }
 
+  // ============================================================================
+  // BOOKING TOOLS
+  // Availability lookup, create, and cancel viewing bookings
+  // ============================================================================
+
   private async getAvailability(
     propertyId: string,
     args: Record<string, unknown>,
@@ -196,6 +239,7 @@ export class ToolHandlers {
       await this.saveSessionMemory(loaded.sessionId, memory);
     }
 
+    // [WHY] empty payload includes a hint so the model offers another date instead of inventing slots
     if (result.slots.length === 0) {
       return JSON.stringify({
         ...result,
@@ -234,6 +278,7 @@ export class ToolHandlers {
       return JSON.stringify({ error: 'Authenticated user not found' });
     }
 
+    // [WHY] contact details come from the account profile — model must not ask the seeker
     const contactName = getStringArg(args, 'contact_name') ?? user.name;
     const contactEmail = getStringArg(args, 'contact_email') ?? user.email;
 
@@ -287,6 +332,7 @@ export class ToolHandlers {
         },
       });
     } catch (error) {
+      // [WHY] return availableSlots on failure so the UI can show buttons again without inventing a booking
       if (error instanceof ServiceError) {
         logger.warn(`create_booking failed: ${error.message}`);
         const availability = await propertiesService.getAvailability(propertyId, {}).catch(() => null);
@@ -309,6 +355,14 @@ export class ToolHandlers {
     }
   }
 
+  /**
+   * Resolves which booking to cancel: explicit id, session memory, then latest confirmed.
+   *
+   * @param userId - Authenticated seeker id
+   * @param context - Agent context with property and session
+   * @param args - Tool args that may include booking_id
+   * @returns Booking id to cancel, or null if none found
+   */
   private async resolveBookingIdForCancel(
     userId: string,
     context: AgentContext,
@@ -325,6 +379,7 @@ export class ToolHandlers {
       return fromMemory;
     }
 
+    // [WHY] fall back to latest CONFIRMED on this property when the model omits booking_id
     const latest = await prisma.booking.findFirst({
       where: {
         userId,
@@ -375,6 +430,11 @@ export class ToolHandlers {
     }
   }
 
+  // ============================================================================
+  // LISTER TOOLS
+  // Escalate unanswered topics and list OPEN lister questions
+  // ============================================================================
+
   private async sendQuestionToLister(context: AgentContext, args: Record<string, unknown>): Promise<string> {
     const propertyId = this.resolvePropertyId(args, context);
     const rawQuestionText = getStringArg(args, 'question_text');
@@ -410,7 +470,7 @@ export class ToolHandlers {
 
     const canonicalAttributes = getStringArrayArg(args, 'canonical_attributes');
 
-    // Hard guard: never escalate topics the listing already answers.
+    // [WARN] never escalate topics the listing already answers — return alreadyKnown instead
     try {
       const property = await propertiesService.getPropertyForTools(propertyId);
       const sanitized = sanitizePropertyDetailForListingType({
@@ -438,6 +498,7 @@ export class ToolHandlers {
         });
       }
     } catch (error) {
+      // [WHY] fail open into createQuestion — blocking escalation on a lookup error would strand the user
       logger.warn(
         `Could not check known listing answers before escalation: ${error instanceof Error ? error.message : 'unknown error'}`,
       );
@@ -494,12 +555,18 @@ export class ToolHandlers {
     });
   }
 
+  // ============================================================================
+  // LEADS TOOLS
+  // Contact capture and callback requests
+  // ============================================================================
+
   private async captureContact(userId: string, args: Record<string, unknown>): Promise<string> {
     const name = getStringArg(args, 'name');
     const email = getStringArg(args, 'email');
     const purpose = getStringArg(args, 'purpose');
     const consent = getBooleanArg(args, 'consent');
 
+    // [SEC] consent must be explicitly true — never coerce missing/false into a lead
     if (!name || !email || !purpose || consent !== true) {
       return JSON.stringify({ error: 'name, email, purpose, and consent=true are required' });
     }
@@ -539,6 +606,11 @@ export class ToolHandlers {
 
     return JSON.stringify({ callback, requested: true });
   }
+
+  // ============================================================================
+  // MEMORY TOOLS
+  // Session context memory and approved lister answers
+  // ============================================================================
 
   private async readSessionMemory(
     sessionId: string,
