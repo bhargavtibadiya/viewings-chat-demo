@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { resolveCanonicalIntent } from './intentRouting.js';
+import { resolveCanonicalIntent } from '../../../../services/ai/helpers/routing/intentRouting.js';
 
 describe('intentRouting', () => {
   it('maps buy a bed to furnishing, not bedrooms', () => {
