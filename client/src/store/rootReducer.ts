@@ -9,6 +9,7 @@ import bookingsReducer from '@/store/bookings/bookings.slice';
 import listerReducer from '@/store/lister/lister.slice';
 import demoReducer from '@/store/demo/demo.slice';
 
+// [SEC] Persist only credentials needed to restore the session; request state must be fresh.
 const authPersistConfig: PersistConfig<AuthSliceInterface> = {
   key: 'auth',
   storage: persistStorage,

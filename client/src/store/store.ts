@@ -22,6 +22,7 @@ export const persistor = persistStore(store, null, () => {
 });
 
 store.subscribe(() => {
+  // [SEC] Keep the HTTP client aligned with token changes, including logout.
   const token = store.getState().auth.token;
   setAuthToken(token);
 });
