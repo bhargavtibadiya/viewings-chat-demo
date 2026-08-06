@@ -1,5 +1,5 @@
 import type { Prisma } from '../../../generated/client.js';
-import type { ChatAction, ChatFact, ToolCallRecord } from '../../../services/ai/types/ai.types.js';
+import type { ChatAction, ChatFact, ToolCallRecord } from '../../../services/ai/index.js';
 
 export function chatActionsToJson(actions: ChatAction[]): Prisma.InputJsonValue {
   return actions.map((action) => {

@@ -1,5 +1,5 @@
 import type { AnswerStatus, MessageRole } from '../../../generated/client.js';
-import type { ChatAction, ChatDebugInfo, ChatFact, SessionMemory } from '../../../services/ai/types/ai.types.js';
+import type { ChatAction, ChatDebugInfo, ChatFact, SessionMemory } from '../../../services/ai/index.js';
 
 export interface SafeChatSession {
   id: string;

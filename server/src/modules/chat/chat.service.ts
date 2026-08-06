@@ -1,12 +1,17 @@
 import type { Prisma, ChatMessage, ChatSession } from '../../generated/client.js';
 import prisma from '../../config/prisma.js';
-import { agentLoop } from '../../services/ai/agentLoop.js';
 import {
+  agentLoop,
   emptySessionMemory,
   parseSessionMemory,
   sessionMemoryToJson,
   setActiveBookingPref,
-} from '../../services/ai/tools/sessionMemory.js';
+  enrichListerQuestion,
+  ALREADY_ASKED_LISTER_REPLY,
+  API_FAILURE_ACK,
+  pickOpeningGreeting,
+} from '../../services/ai/index.js';
+import type { ChatAction } from '../../services/ai/index.js';
 import { createServiceError, ServiceError } from '../../utils/helpers/serviceError.js';
 import { notDeleted } from '../../utils/helpers/softDelete.js';
 import { AI } from '../../utils/constants/pagination.js';
@@ -29,10 +34,6 @@ import {
 } from './helpers/chatJson.js';
 import { listerService } from '../lister/lister.service.js';
 import { bookingsService } from '../bookings/bookings.service.js';
-import type { ChatAction } from '../../services/ai/types/ai.types.js';
-import { enrichListerQuestion } from '../../services/ai/helpers/enrichListerQuestion.js';
-import { ALREADY_ASKED_LISTER_REPLY } from '../../services/ai/helpers/openListerQuestions.js';
-import { API_FAILURE_ACK, pickOpeningGreeting } from '../../services/ai/policies/scopeGuard.js';
 import { formatNzDateTime } from '../../utils/helpers/date.js';
 import { createLogger } from '../../utils/helpers/logger.js';
 import { propertiesService } from '../properties/properties.service.js';
