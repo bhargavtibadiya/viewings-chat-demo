@@ -16,7 +16,7 @@ Use this for live demos. These cases match **implemented** behaviour only (prope
 | 8 | **Consistency** | Ask weekly rent (or price) twice | Same verified figure both times. No contradiction. |
 | 9 | **Rental vs sale** | On a **sale** listing: `What is the bond?` or `What is the weekly rent?` | Does not apply rental rules; says N/A / not for sale listings / not specified. |
 | 10 | **Pets (listing type aware)** | `Are pets allowed?` | Rental: from `pets_policy`. Sale: ownership / body corporate context, not rental tenant rules. |
-| 11 | **Ask lister + already asked** | A: unknown topic → B: `ask the lister` → C: same question while still OPEN | B confirms send. C says already asked; will share when lister replies. No duplicate escalation. |
+| 11 | **Ask lister only if missing** | A: `Ask the lister about the floor area.` (when sqm exists) | Answers from listing (e.g. 42 m²). Does **not** escalate. Escalate only when the fact is truly missing. |
 | 12 | **Viewing slots** | `Show me available viewing times` | Live slots (buttons and/or short intro). Real NZ times only. Dates/times *italic* when written. |
 | 13 | **Book a viewing** | Pick a slot button (or name a shown time) | Confirmed booking + real reference. Ref underlined when present. Points to My bookings. |
 | 14 | **Cancel booking** | After #13: `Cancel my booking` | Cancels the session’s booking (no need to paste id). Confirms cancel or clear failure. |
