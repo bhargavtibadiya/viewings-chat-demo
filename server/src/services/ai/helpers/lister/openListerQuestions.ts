@@ -1,7 +1,7 @@
-/**
- * Deterministic matching for OPEN lister escalations so we do not
- * re-offer ask-the-lister when a similar question is already pending.
- */
+// ============================================================================
+// OPEN LISTER QUESTION MATCHING
+// Avoid re-offering ask-the-lister when a similar OPEN question exists
+// ============================================================================
 
 export const ALREADY_ASKED_LISTER_REPLY =
   "I've already asked the lister about that. I'll share their answer as soon as they respond.";
@@ -13,7 +13,12 @@ export interface OpenListerQuestionCandidate {
   resolvedIntent?: string | null;
 }
 
-/** Topic keyword groups → canonical attribute keys they imply. */
+// ============================================================================
+// TOPIC GROUPS & STOP WORDS
+// Keyword → attribute maps and tokens ignored by fuzzy similarity
+// ============================================================================
+
+// [NOTE] order matters — more specific outdoor-pet keywords must precede generic pets
 const TOPIC_GROUPS: Array<{ attributes: string[]; keywords: string[] }> = [
   {
     attributes: ['floor_area_sqm', 'floor_area', 'land_area_sqm'],
@@ -197,6 +202,17 @@ const STOP_WORDS = new Set([
   'available',
 ]);
 
+// ============================================================================
+// NORMALIZATION & TOPIC INFERENCE
+// Shared text cleanup and keyword → attribute inference
+// ============================================================================
+
+/**
+ * Normalizes question text for deterministic comparison.
+ *
+ * @param text - Raw question text
+ * @returns Lowercased text with punctuation collapsed to spaces
+ */
 export function normalizeQuestionText(text: string): string {
   return text
     .toLowerCase()
@@ -221,6 +237,12 @@ function parseAttributes(value: string[] | null | undefined): string[] {
     .filter((item) => item.length > 0 && item !== 'general');
 }
 
+/**
+ * Infers canonical attribute keys from free-text question wording.
+ *
+ * @param text - Question text to scan for topic keywords
+ * @returns Deduplicated attribute keys implied by matching topic groups
+ */
 export function inferTopicAttributes(text: string): string[] {
   const normalized = normalizeQuestionText(text);
   const attrs = new Set<string>();
@@ -230,6 +252,7 @@ export function inferTopicAttributes(text: string): string[] {
       const needle = keyword.toLowerCase();
       return (
         normalized.includes(needle) ||
+        // [WHY] also match underscore/hyphen variants of single-token keywords
         normalized.split(' ').some((token) => token === needle || token.replace(/_/g, '-') === needle)
       );
     });
@@ -251,7 +274,13 @@ function attributesOverlap(a: string[], b: string[]): boolean {
   return a.some((item) => setB.has(item));
 }
 
-/** Jaccard similarity on meaningful tokens (0–1). */
+/**
+ * Computes Jaccard similarity on meaningful tokens between two strings.
+ *
+ * @param a - First question text
+ * @param b - Second question text
+ * @returns Similarity in [0, 1]; 0 when either side has no content tokens
+ */
 export function tokenSimilarity(a: string, b: string): number {
   const tokensA = new Set(tokenize(a));
   const tokensB = new Set(tokenize(b));
@@ -285,6 +314,18 @@ function sharedTopicKeywords(a: string, b: string): boolean {
   return false;
 }
 
+// ============================================================================
+// SIMILARITY MATCHING
+// Decide whether a new escalation duplicates an OPEN question
+// ============================================================================
+
+/**
+ * Decides whether a candidate escalation matches an existing OPEN question.
+ *
+ * @param candidate - New question text and optional canonical attributes
+ * @param existing - OPEN lister question already awaiting an answer
+ * @returns True when texts, attributes, topic keywords, or fuzzy tokens overlap
+ */
 export function questionsAreSimilar(
   candidate: { questionText: string; canonicalAttributes?: string[] | null },
   existing: OpenListerQuestionCandidate,
@@ -317,7 +358,7 @@ export function questionsAreSimilar(
     return true;
   }
 
-  // Fuzzy text: require a modest overlap of content words.
+  // [WHY] 0.45 requires modest content-word overlap without equating unrelated asks
   if (tokenSimilarity(candidate.questionText, existing.questionText) >= 0.45) {
     return true;
   }
@@ -325,6 +366,13 @@ export function questionsAreSimilar(
   return false;
 }
 
+/**
+ * Finds the first OPEN question similar to a candidate escalation.
+ *
+ * @param openQuestions - OPEN questions already sent for this session
+ * @param candidate - New question text and optional canonical attributes
+ * @returns Matching OPEN question, or null when none are similar
+ */
 export function findSimilarOpenQuestion(
   openQuestions: OpenListerQuestionCandidate[],
   candidate: { questionText: string; canonicalAttributes?: string[] | null },
@@ -343,6 +391,17 @@ export function findSimilarOpenQuestion(
   return null;
 }
 
+// ============================================================================
+// PROMPT FORMATTING
+// Inject OPEN questions into the model context so it avoids re-asking
+// ============================================================================
+
+/**
+ * Formats OPEN lister questions as prompt context for the agent.
+ *
+ * @param openQuestions - OPEN questions awaiting a lister answer
+ * @returns Multi-line prompt block, or empty string when none are open
+ */
 export function formatOpenQuestionsForPrompt(openQuestions: OpenListerQuestionCandidate[]): string {
   if (openQuestions.length === 0) {
     return '';
