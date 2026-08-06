@@ -10,6 +10,14 @@ export class UsersController {
     this.authService = new AuthService();
   }
 
+  /**
+   * Returns the authenticated user's profile.
+   *
+   * @param req - Authenticated Express request
+   * @param res - Express response used to return the profile
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   getMe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {

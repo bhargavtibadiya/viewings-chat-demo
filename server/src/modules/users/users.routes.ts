@@ -5,11 +5,7 @@ import { ROUTES } from '../../utils/constants/routes.js';
 
 const router = Router();
 
-/**
- * @route   GET /api/users/me
- * @desc    Get current user profile
- * @access  Protected
- */
+// [NOTE] Get current user profile
 router.get(
   ROUTES.USERS.ME,
   authenticate,
