@@ -1,5 +1,10 @@
-import type { SafeListingAttribute, SafePropertyDetail } from '../../../modules/properties/types/properties.types.js';
+import type { SafeListingAttribute, SafePropertyDetail } from '../../../../modules/properties/types/properties.types.js';
 import { inferTopicAttributes } from './openListerQuestions.js';
+
+// ============================================================================
+// KNOWN LISTING ANSWERS
+// Block escalation when the listing already answers the topic
+// ============================================================================
 
 export interface KnownListingFact {
   attribute: string;
@@ -7,6 +12,12 @@ export interface KnownListingFact {
   source: string;
 }
 
+// ============================================================================
+// ATTRIBUTE LOOKUP
+// Aliases and formatters for core fields vs listing attributes
+// ============================================================================
+
+// [NOTE] keys are bidirectional — floor_area and floor_area_sqm share the same aliases
 const ATTRIBUTE_ALIASES: Record<string, string[]> = {
   floor_area: ['floor_area_sqm', 'floor_area', 'floorarea_sqm'],
   floor_area_sqm: ['floor_area_sqm', 'floor_area', 'floorarea_sqm'],
@@ -25,6 +36,7 @@ function formatAttributeValue(value: string | number | boolean | string[] | null
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();
+    // [WHY] treat literal "unknown" as missing — not a real answer to surface
     if (!trimmed || trimmed.toLowerCase() === 'unknown') {
       return null;
     }
@@ -123,9 +135,16 @@ function displayFactValue(fact: KnownListingFact): string {
   return fact.value;
 }
 
+// ============================================================================
+// RESOLUTION & REPLY
+// Public API: find known facts and format the already-on-listing reply
+// ============================================================================
+
 /**
- * Resolve listing facts that already answer an escalation topic.
- * If any requested topic has a real listing value, escalation should be blocked.
+ * Resolves listing facts that already answer an escalation topic.
+ *
+ * @param input - Property detail, question text, and optional canonical attributes
+ * @returns Known facts for requested topics; empty when none are on the listing
  */
 export function findKnownListingAnswers(input: {
   property: SafePropertyDetail;
@@ -144,6 +163,7 @@ export function findKnownListingAnswers(input: {
     requested.add(attr.toLowerCase());
   }
 
+  // [WHY] floor-area regex is a belt-and-suspenders path when topic inference misses
   const lowered = input.questionText.toLowerCase();
   if (/\bfloor\s*area\b|\bsqm\b|\bm\s*2\b|\bm²\b|\bsquare\s+metr/i.test(lowered)) {
     requested.add('floor_area_sqm');
@@ -158,6 +178,7 @@ export function findKnownListingAnswers(input: {
   const seen = new Set<string>();
 
   for (const attribute of requested) {
+    // Q: why check core fields before attributes? A: core columns are authoritative for beds/baths/parking/rent
     const fromCore = coreFieldFact(input.property, attribute);
     if (fromCore && !seen.has(fromCore.attribute)) {
       seen.add(fromCore.attribute);
@@ -179,6 +200,12 @@ export function findKnownListingAnswers(input: {
   return facts;
 }
 
+/**
+ * Formats a seeker-facing reply when listing facts already answer the ask.
+ *
+ * @param facts - Known listing facts to surface (may be empty)
+ * @returns Reply telling the seeker the detail is already on the listing
+ */
 export function formatAlreadyKnownListerReply(facts: KnownListingFact[]): string {
   if (facts.length === 0) {
     return 'That detail is already on the listing, so there is no need to ask the lister.';
