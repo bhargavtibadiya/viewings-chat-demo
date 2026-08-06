@@ -18,6 +18,12 @@ interface ChatThreadProps {
 
 const SCROLL_TOP_THRESHOLD_PX = 80;
 
+/**
+ * Renders a paginated chat transcript while preserving the reader's scroll position.
+ *
+ * @param props - Messages, loading state, and pagination and booking callbacks
+ * @returns The scrollable chat transcript
+ */
 export function ChatThread({
   messages,
   isThinking,
@@ -53,6 +59,7 @@ export function ChatThread({
     if (!container) return;
 
     if (isPrependingRef.current) {
+      // [WHY] restore the prior viewport after older messages increase scroll height above it.
       container.scrollTop = container.scrollHeight - prevScrollHeightRef.current;
       isPrependingRef.current = false;
       return;
@@ -68,6 +75,7 @@ export function ChatThread({
     if (!container) return;
 
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    // [WHY] preserve reading position unless the user is already near the latest message.
     shouldStickToBottomRef.current = distanceFromBottom < 120;
 
     if (!loadingOlder && hasMoreOlder && container.scrollTop < SCROLL_TOP_THRESHOLD_PX) {

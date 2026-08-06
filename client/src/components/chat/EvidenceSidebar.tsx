@@ -9,6 +9,12 @@ interface EvidencePickerProps {
   compact?: boolean;
 }
 
+/**
+ * Lets demo users send a predefined evidence prompt into the active chat.
+ *
+ * @param props - Prompt selection callback and display options
+ * @returns The evidence-case picker
+ */
 export function EvidencePicker({
   onSelectPrompt,
   className,
@@ -32,6 +38,11 @@ export function EvidencePicker({
 
   const canSend = Boolean(selected?.message.trim());
 
+  /**
+   * Sends the selected sendable prompt and resets the selection.
+   *
+   * @returns Nothing when no prompt can be sent
+   */
   const handleRun = (): void => {
     if (!selected || !canSend) return;
     onSelectPrompt(selected);
@@ -79,6 +90,12 @@ interface EvidenceSheetProps {
   onSelectPrompt: (prompt: EvidencePrompt) => void;
 }
 
+/**
+ * Shows the evidence picker in a mobile bottom sheet.
+ *
+ * @param props - Sheet visibility and prompt-selection callbacks
+ * @returns The mobile sheet, or nothing while closed
+ */
 export function EvidenceSheet({
   open,
   onClose,

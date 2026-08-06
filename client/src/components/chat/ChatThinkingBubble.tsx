@@ -1,7 +1,9 @@
 import { Skeleton } from '@/components/ui';
 
 /**
- * ChatGPT-style shimmer skeleton shown while the assistant is thinking.
+ * Renders an accessible assistant-response loading indicator.
+ *
+ * @returns The assistant thinking placeholder
  */
 export function ChatThinkingBubble(): React.ReactElement {
   return (
