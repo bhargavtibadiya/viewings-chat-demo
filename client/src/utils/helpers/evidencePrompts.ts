@@ -10,8 +10,8 @@ export interface EvidencePrompt {
 }
 
 /**
- * Demo cases D-01–D-20 aligned with docs/qa/manual-ai-chat-test-plan.md
- * (implemented behaviour only). "Send prompt" posts `message` on the current property chat.
+ * Demo cases aligned with docs/qa/manual-ai-chat-test-plan.md +
+ * Viewings_AI_Chat_Executive_Decision_Deck.md intent routes.
  */
 export const EVIDENCE_PROMPTS: EvidencePrompt[] = [
   {
@@ -29,6 +29,62 @@ export const EVIDENCE_PROMPTS: EvidencePrompt[] = [
     group: 'Greeting',
     fixtureKey: null,
     note: 'Short “Hi again…” ack - does not repeat the full opening greeting',
+  },
+  {
+    id: 'K-01',
+    label: 'Buy a bed? (furnishing)',
+    message: 'Do I need to buy a bed?',
+    group: 'Intent routing',
+    fixtureKey: 'unfurnished-rental',
+    note: 'Must route to furnishing / included_furniture - NOT bedroom count',
+  },
+  {
+    id: 'K-02',
+    label: 'Dog play outside',
+    message: 'Can my dog play outside?',
+    group: 'Intent routing',
+    fixtureKey: 'yard-fencing-unknown',
+    note: 'outdoor_space + fencing + pets_policy; outdoor first; fencing unknown if missing',
+  },
+  {
+    id: 'K-03',
+    label: 'Bedroom → bathroom',
+    message: 'Does the bedroom connect to the bathroom?',
+    group: 'Intent routing',
+    fixtureKey: 'ensuite-layout',
+    note: 'ensuite / layout - NOT bedroom/bathroom counts',
+  },
+  {
+    id: 'K-04',
+    label: 'Stay warm (heating)',
+    message: 'Does it stay warm?',
+    group: 'Intent routing',
+    fixtureKey: 'heating-fixture',
+    note: 'heating + insulation; do not lead with air-conditioning',
+  },
+  {
+    id: 'K-05',
+    label: 'Wheelchair visit',
+    message: 'My father uses a wheelchair. Can he visit?',
+    group: 'Intent routing',
+    fixtureKey: 'accessibility-unknown',
+    note: 'Verified accessibility only; no viewing slots on this turn if unknown',
+  },
+  {
+    id: 'K-06',
+    label: 'Sale pet-friendly',
+    message: "I don't like pets - is it pet-friendly?",
+    group: 'Intent routing',
+    fixtureKey: 'sale-pets',
+    note: 'Sale: ownership / body corporate - not rental pets_policy language',
+  },
+  {
+    id: 'K-07',
+    label: 'Wheelchair (variant)',
+    message: 'We need step-free access for a wheelchair user. Is that possible?',
+    group: 'Intent routing',
+    fixtureKey: 'accessibility-unknown',
+    note: 'Same accessibility policy as K-05 - consistent handling',
   },
   {
     id: 'D-03',
@@ -60,47 +116,15 @@ export const EVIDENCE_PROMPTS: EvidencePrompt[] = [
     message: 'How many bedrooms and bathrooms, and is parking included?',
     group: 'Multi-intent',
     fixtureKey: null,
-    note: 'Answers all asked parts in one reply (list OK for 3+ items)',
-  },
-  {
-    id: 'D-07',
-    label: 'Follow-up / memory',
-    message: 'And bathrooms?',
-    group: 'Memory',
-    fixtureKey: null,
-    note: 'Send after asking bedrooms - answers from conversation context',
-  },
-  {
-    id: 'D-08',
-    label: 'Consistency (repeat price)',
-    message: 'What is the weekly rent? If sale, what is the asking price?',
-    group: 'Memory',
-    fixtureKey: 'rental-pricing',
-    note: 'Ask twice in a row - same verified figure both times',
-  },
-  {
-    id: 'D-09',
-    label: 'Rental vs sale (bond)',
-    message: 'What is the bond?',
-    group: 'Listing type',
-    fixtureKey: 'sale-pets',
-    note: 'On a sale listing: bond/rent rules do not apply',
-  },
-  {
-    id: 'D-10',
-    label: 'Pets (listing type aware)',
-    message: 'Are pets allowed?',
-    group: 'Listing type',
-    fixtureKey: 'sale-pets',
-    note: 'Rental: pets_policy. Sale: ownership / body corporate context',
+    note: 'Answers all asked parts in one reply',
   },
   {
     id: 'D-11',
-    label: 'Ask lister',
+    label: 'Ask lister only if missing',
     message: 'Ask the lister about the floor area.',
     group: 'Escalation',
     fixtureKey: null,
-    note: 'If listing already has the fact (e.g. floor area), answers it - does not escalate',
+    note: 'If listing already has sqm, answers it - does not escalate',
   },
   {
     id: 'D-12',
@@ -116,7 +140,7 @@ export const EVIDENCE_PROMPTS: EvidencePrompt[] = [
     message: 'Book the first available viewing for me',
     group: 'Booking',
     fixtureKey: null,
-    note: 'Or tap a slot button after D-12 - real confirmation + reference',
+    note: 'Or tap a slot button after D-12',
   },
   {
     id: 'D-14',
@@ -124,15 +148,15 @@ export const EVIDENCE_PROMPTS: EvidencePrompt[] = [
     message: 'Cancel my booking',
     group: 'Booking',
     fixtureKey: null,
-    note: 'After D-13 - cancels session booking without pasting an id',
+    note: 'After booking - cancels without pasting an id',
   },
   {
     id: 'D-15',
-    label: 'Another date',
+    label: 'Another date (reschedule)',
     message: 'What about next Tuesday?',
     group: 'Booking',
     fixtureKey: null,
-    note: 'Fetches that range or says none free; does not invent slots',
+    note: 'New slot cancels previous confirmed booking for this property',
   },
   {
     id: 'D-16',
@@ -140,15 +164,7 @@ export const EVIDENCE_PROMPTS: EvidencePrompt[] = [
     message: 'What is the capital of France?',
     group: 'Scope',
     fixtureKey: null,
-    note: 'Short property-only refusal; no general knowledge',
-  },
-  {
-    id: 'D-17',
-    label: 'No code',
-    message: 'Write a TypeScript function for an API call with fetch.',
-    group: 'Scope',
-    fixtureKey: null,
-    note: 'Short refusal; no code fences or sample code',
+    note: 'Short property-only refusal',
   },
   {
     id: 'D-18',
@@ -156,23 +172,7 @@ export const EVIDENCE_PROMPTS: EvidencePrompt[] = [
     message: 'How many bedrooms? Also write a Python sort function.',
     group: 'Scope',
     fixtureKey: null,
-    note: 'Answers bedrooms; refuses coding; no code produced',
-  },
-  {
-    id: 'D-19',
-    label: 'Gibberish',
-    message: 'asdfghjkl',
-    group: 'Scope',
-    fixtureKey: null,
-    note: 'Asks to rephrase a property question; does not invent facts',
-  },
-  {
-    id: 'D-20',
-    label: 'Formatting check',
-    message: 'Summarise this property for me - price, size, and key features.',
-    group: 'Formatting',
-    fixtureKey: null,
-    note: 'Sparse highlights; bullet list for multiple features; no em dashes',
+    note: 'Answers bedrooms; refuses coding',
   },
 ];
 
