@@ -18,6 +18,13 @@ export class AuthService {
     };
   }
 
+  /**
+   * Authenticates a user and issues their access token.
+   *
+   * @param dto - Validated login credentials
+   * @returns The access token and safe user profile
+   * @throws {ServiceError} if the credentials are invalid
+   */
   async login(dto: LoginDtoType): Promise<LoginResponse> {
     const user = await prisma.user.findFirst({
       where: { email: dto.email, ...notDeleted() },
@@ -38,6 +45,13 @@ export class AuthService {
     return { token, user: safeUser };
   }
 
+  /**
+   * Retrieves a user's safe profile.
+   *
+   * @param userId - ID of the user to retrieve
+   * @returns The safe user profile
+   * @throws {ServiceError} if the user does not exist
+   */
   async getMe(userId: string): Promise<SafeUser> {
     const user = await prisma.user.findFirst({
       where: { id: userId, ...notDeleted() },
@@ -51,10 +65,21 @@ export class AuthService {
     return this.toSafeUser(user);
   }
 
+  /**
+   * Hashes a password using the application's configured work factor.
+   *
+   * @param password - Plain-text password to hash
+   * @returns The password hash
+   */
   async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 12);
   }
 
+  /**
+   * Returns the configured demo account password.
+   *
+   * @returns The demo password
+   */
   getDemoPassword(): string {
     return env.DEMO_PASSWORD;
   }

@@ -6,22 +6,14 @@ import { authLoginLimiter } from '../../services/rate-limit/index.js';
 
 const router = Router();
 
-/**
- * @route   POST /api/auth/login
- * @desc    Login with email and password
- * @access  Public
- */
+// [SEC] Login requests are rate-limited before credential validation to slow brute-force attempts.
 router.post(
   ROUTES.AUTH.LOGIN,
   authLoginLimiter,
   authController.login,
 );
 
-/**
- * @route   GET /api/auth/me
- * @desc    Get current authenticated user
- * @access  Protected
- */
+// [NOTE] Return the current profile only after token authentication succeeds.
 router.get(
   ROUTES.AUTH.ME,
   authenticate,

@@ -15,6 +15,14 @@ export class AuthController {
     this.authService = new AuthService();
   }
 
+  /**
+   * Authenticates a user from the login request body.
+   *
+   * @param req - Express request containing credentials
+   * @param res - Express response used to return the login result
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dtoResult = LoginDto.safeParse(req.body);
@@ -37,6 +45,14 @@ export class AuthController {
     }
   };
 
+  /**
+   * Returns the authenticated user's profile.
+   *
+   * @param req - Authenticated Express request
+   * @param res - Express response used to return the profile
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   me = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
