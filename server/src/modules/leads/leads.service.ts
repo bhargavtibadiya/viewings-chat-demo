@@ -5,6 +5,12 @@ import type { CaptureContactInput, RequestCallbackInput } from './dto/leads.dto.
 import type { SafeCallbackRequest, SafeContactLead } from './types/leads.types.js';
 
 export class LeadsService {
+  /**
+   * Creates a contact lead submitted by a visitor.
+   *
+   * @param input - Validated contact details and property context
+   * @returns The persisted contact lead
+   */
   async captureContact(input: CaptureContactInput): Promise<SafeContactLead> {
     const lead = await prisma.contactLead.create({
       data: {
@@ -30,6 +36,13 @@ export class LeadsService {
     };
   }
 
+  /**
+   * Creates a callback request for the lister of an active property.
+   *
+   * @param input - Validated callback request details
+   * @returns The persisted callback request
+   * @throws {ServiceError} if the property does not exist
+   */
   async requestCallback(input: RequestCallbackInput): Promise<SafeCallbackRequest> {
     const property = await prisma.property.findFirst({
       where: { id: input.propertyId, ...notDeleted() },

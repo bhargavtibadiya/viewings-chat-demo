@@ -15,6 +15,14 @@ export class LeadsController {
     this.leadsService = new LeadsService();
   }
 
+  /**
+   * Captures a visitor's contact details for a property.
+   *
+   * @param req - Authenticated Express request containing lead details
+   * @param res - Express response used to return the captured lead
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   captureContact = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dtoResult = ContactLeadDto.safeParse(req.body);
@@ -45,6 +53,14 @@ export class LeadsController {
     }
   };
 
+  /**
+   * Requests a callback from the property's lister.
+   *
+   * @param req - Authenticated Express request containing callback details
+   * @param res - Express response used to return the request
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   requestCallback = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const dtoResult = CallbackRequestDto.safeParse(req.body);
