@@ -4,7 +4,7 @@ import {
   dedupeRepeatedContent,
   polishAssistantContent,
   toneDownExcessBold,
-} from './responseQuality.js';
+} from '../../../../services/ai/helpers/quality/responseQuality.js';
 
 describe('responseQuality', () => {
   it('removes duplicated sentences', () => {
