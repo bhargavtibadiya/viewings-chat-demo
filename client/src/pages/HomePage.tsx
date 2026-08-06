@@ -9,6 +9,11 @@ import { useCommandPalette } from '@/hooks/use-command-palette';
 import { formatListingType } from '@/utils/helpers/propertyFormatters';
 import { cn } from '@/utils/helpers/cn';
 
+/**
+ * Displays the marketplace catalog with local listing-type filtering and search.
+ *
+ * @returns The marketplace route content
+ */
 export function HomePage(): React.ReactElement {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -22,6 +27,7 @@ export function HomePage(): React.ReactElement {
   useCommandPalette(() => setSearchOpen((current) => !current), true);
 
   useEffect(() => {
+    // [WHY] preserve the shared catalog cache when users return from a listing.
     if (hasRequested || loading) return;
     dispatch(getPropertiesThunk(filters));
   }, [dispatch, filters, hasRequested, loading]);

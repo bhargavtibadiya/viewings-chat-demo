@@ -26,6 +26,11 @@ import {
   CHAT_MESSAGES_FETCH_INITIAL_KEY,
 } from '@/store/chat/chat.types';
 
+/**
+ * Hosts a property's AI chat session, message history, and evidence prompts.
+ *
+ * @returns The property-chat route content
+ */
 export function ChatPage(): React.ReactElement {
   const { propertyId = '' } = useParams();
   const location = useLocation();
@@ -58,6 +63,11 @@ export function ChatPage(): React.ReactElement {
   const [draft, setDraft] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  // ============================================================================
+  // CHAT SESSION LIFECYCLE
+  // Loads and clears property-specific state as the active route changes
+  // ============================================================================
+
   useEffect(() => {
     if (propertyId.length === 0) return undefined;
     if (user?.role === 'LISTER') {
@@ -82,7 +92,7 @@ export function ChatPage(): React.ReactElement {
     const hasInitialCache = cached?.fetchedKeys.includes(CHAT_MESSAGES_FETCH_INITIAL_KEY);
     const cachedHasMessages = (cached?.messages?.length ?? 0) > 0;
 
-    // Re-fetch empty threads so the server can seed the opening greeting.
+    // [WHY] a populated initial cache can render immediately without another network request.
     if (hasInitialCache && cachedHasMessages) {
       dispatch(hydrateMessagesFromCache({ sessionId: session.id }));
       dispatch(setActiveSessionId(session.id));
@@ -132,11 +142,22 @@ export function ChatPage(): React.ReactElement {
     };
   }, [dispatch, session]);
 
+  // ============================================================================
+  // CHAT INTERACTIONS
+  // Coordinates sending, pagination, booking, and draft input behavior
+  // ============================================================================
+
+  /**
+   * Sends a non-empty message to the session for the property in the current route.
+   *
+   * @param content - Draft or prompt text to submit
+   * @returns A promise that settles after the message request or session refresh completes
+   */
   const handleSend = useCallback(
     async (content: string): Promise<void> => {
       if (!session || content.trim().length === 0) return;
       if (session.propertyId !== propertyId) {
-        // Stale session after a property switch — refresh before sending.
+        // [WARN] never send through a session that belongs to a previously viewed property.
         await dispatch(getSessionThunk({ propertyId }));
         return;
       }
@@ -153,6 +174,11 @@ export function ChatPage(): React.ReactElement {
     [dispatch, propertyId, session],
   );
 
+  /**
+   * Requests the next older page when the loaded history exposes a cursor.
+   *
+   * @returns No value; dispatches only when an older page is available
+   */
   const handleLoadOlder = useCallback(() => {
     if (!session || !messagesPagination?.oldestMessageId || loadingOlder) return;
 
@@ -165,6 +191,13 @@ export function ChatPage(): React.ReactElement {
     );
   }, [dispatch, loadingOlder, messagesPagination?.oldestMessageId, session]);
 
+  /**
+   * Books a suggested slot unless another turn or booking request is active.
+   *
+   * @param slotId - Availability slot selected by the user
+   * @param label - Human-readable slot label retained with the booking action
+   * @returns No value; dispatches only when the session is ready
+   */
   const handleBookSlot = useCallback(
     (slotId: string, label: string): void => {
       if (!session || bookSlotLoading || sendLoading || askListerLoading) return;
@@ -179,6 +212,11 @@ export function ChatPage(): React.ReactElement {
     [askListerLoading, bookSlotLoading, dispatch, sendLoading, session],
   );
 
+  /**
+   * Prevents native form navigation and submits the current draft.
+   *
+   * @param event - Native chat form submission event
+   */
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     void handleSend(draft);
@@ -187,6 +225,11 @@ export function ChatPage(): React.ReactElement {
   const isChatLoading = sessionLoading || messagesLoading;
   const isBusy = sendLoading || askListerLoading || bookSlotLoading;
 
+  /**
+   * Sends on Enter while preserving Shift+Enter for multiline drafts.
+   *
+   * @param event - Keyboard event from the message textarea
+   */
   const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -196,9 +239,13 @@ export function ChatPage(): React.ReactElement {
     }
   };
 
+  /**
+   * Submits an evidence prompt as a normal message for the active property.
+   *
+   * @param prompt - Prompt selected from the evidence controls
+   */
   const handlePromptSelect = (prompt: EvidencePrompt): void => {
-    // Always stay on the active property chat — send as a normal human message.
-    // Fixture keys are metadata for the Demo control panel only.
+    // [WHY] fixture keys only support the demo panel; chat sends the prompt text unchanged.
     if (!prompt.message.trim()) return;
     void handleSend(prompt.message);
   };
@@ -348,6 +395,12 @@ interface DebugBlockProps {
   value: string;
 }
 
+/**
+ * Renders one value in the optional chat debug strip.
+ *
+ * @param props - Debug label and its rendered value
+ * @returns A compact debug summary block
+ */
 function DebugBlock({ title, value }: DebugBlockProps): React.ReactElement {
   return (
     <div className="rounded-[var(--radius-sm)] bg-[var(--color-bg-secondary)] px-2.5 py-2">
@@ -359,6 +412,12 @@ function DebugBlock({ title, value }: DebugBlockProps): React.ReactElement {
   );
 }
 
+/**
+ * Extracts a route-carried draft message only when it has the expected shape.
+ *
+ * @param state - Untrusted router location state
+ * @returns A pending message, or null when route state does not provide one
+ */
 function getPendingMessage(state: unknown): string | null {
   if (typeof state !== 'object' || state === null || !('pendingMessage' in state)) {
     return null;

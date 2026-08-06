@@ -6,6 +6,11 @@ import { useAppDispatch, useAppSelector } from '@/store/store';
 import { loginThunk } from '@/store/auth/auth.thunk';
 import { clearAuthError } from '@/store/auth/auth.slice';
 
+/**
+ * Renders the sign-in form and redirects after successful authentication.
+ *
+ * @returns The login route content
+ */
 export function LoginPage(): React.ReactElement {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -14,6 +19,12 @@ export function LoginPage(): React.ReactElement {
   const [email, setEmail] = useState('seeker@viewings.demo');
   const [password, setPassword] = useState('DemoPass123!');
 
+  /**
+   * Submits credentials after removing any error from an earlier attempt.
+   *
+   * @param event - Native form submission event
+   * @returns A promise that settles after authentication completes
+   */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     dispatch(clearAuthError());
