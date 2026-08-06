@@ -24,16 +24,31 @@ export function ChatMarkdown({ content, inverted = false }: ChatMarkdownProps): 
           p: ({ children }) => (
             <p className={cn('mb-2 last:mb-0', inverted && 'text-[var(--color-text-inverse)]')}>{children}</p>
           ),
-          ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-4 last:mb-0">{children}</ul>,
-          ol: ({ children }) => <ol className="mb-2 list-decimal space-y-1 pl-4 last:mb-0">{children}</ol>,
+          ul: ({ children }) => (
+            <ul className="mb-2 mt-1 list-disc space-y-1.5 pl-5 last:mb-0 marker:text-[var(--color-primary)]">
+              {children}
+            </ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="mb-2 mt-1 list-decimal space-y-1.5 pl-5 last:mb-0 marker:text-[var(--color-primary)]">
+              {children}
+            </ol>
+          ),
           li: ({ children }) => (
-            <li className={cn(inverted && 'text-[var(--color-text-inverse)]')}>{children}</li>
+            <li
+              className={cn(
+                'leading-relaxed pl-0.5',
+                inverted ? 'text-[var(--color-text-inverse)]' : 'text-[var(--color-text-primary)]',
+              )}
+            >
+              {children}
+            </li>
           ),
           strong: ({ children }) => (
             <strong
               className={cn(
                 'font-semibold',
-                inverted ? 'text-[var(--color-text-inverse)]' : 'text-[var(--color-text-primary)]',
+                inverted ? 'text-[var(--color-text-inverse)]' : 'text-[var(--color-primary)]',
               )}
             >
               {children}
