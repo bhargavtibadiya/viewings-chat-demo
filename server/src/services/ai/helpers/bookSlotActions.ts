@@ -91,9 +91,25 @@ function bookingSucceeded(result: string): boolean {
   }
 }
 
+function availabilityWasEmpty(result: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(result);
+    if (!isRecord(parsed)) {
+      return false;
+    }
+    if (parsed.empty === true) {
+      return true;
+    }
+    return Array.isArray(parsed.slots) && parsed.slots.length === 0;
+  } catch {
+    return false;
+  }
+}
+
 /** Build selectable book_slot CTAs from the latest availability tool results. */
 export function extractBookSlotActions(toolsCalled: ToolCallRecord[]): ChatAction[] {
   let slots: SlotCandidate[] = [];
+  let sawEmptyAvailability = false;
 
   for (const tool of toolsCalled) {
     if (tool.name === 'create_booking' && bookingSucceeded(tool.result)) {
@@ -104,8 +120,21 @@ export function extractBookSlotActions(toolsCalled: ToolCallRecord[]): ChatActio
       const next = slotsFromToolResult(tool.result);
       if (next.length > 0) {
         slots = next;
+        sawEmptyAvailability = false;
+      } else if (tool.name === 'get_availability' && availabilityWasEmpty(tool.result)) {
+        sawEmptyAvailability = true;
       }
     }
+  }
+
+  if (slots.length === 0 && sawEmptyAvailability) {
+    return [
+      {
+        type: 'another_date',
+        label: 'Try another date',
+        payload: { intent: 'another_date' },
+      },
+    ];
   }
 
   return slots.slice(0, 16).map((slot) => {
