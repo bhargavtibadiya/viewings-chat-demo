@@ -161,6 +161,13 @@ export class ToolHandlers {
   // Listing facts and cross-listing search
   // ============================================================================
 
+  /**
+   * Retrieves listing facts, filters them for the listing type, and records reusable core facts.
+   *
+   * @param propertyId - Listing id bound to the active session
+   * @param context - Active agent context that supplies listing type and session id
+   * @returns Serialized, listing-type-safe property payload
+   */
   private async getProperty(propertyId: string, context: AgentContext): Promise<string> {
     const property = await propertiesService.getPropertyForTools(propertyId);
     const sanitized = sanitizePropertyDetailForListingType({
@@ -199,6 +206,12 @@ export class ToolHandlers {
     return JSON.stringify(sanitized);
   }
 
+  /**
+   * Searches listings using the model's optional filters.
+   *
+   * @param args - Parsed search filter arguments
+   * @returns Serialized matching listing summaries
+   */
   private async searchListings(args: Record<string, unknown>): Promise<string> {
     const listingTypeRaw = getStringArg(args, 'listing_type');
     const listingType =
@@ -220,6 +233,14 @@ export class ToolHandlers {
   // Availability lookup, create, and cancel viewing bookings
   // ============================================================================
 
+  /**
+   * Fetches available viewing slots and remembers a requested date range for the session.
+   *
+   * @param propertyId - Listing id bound to the active session
+   * @param args - Parsed availability range arguments
+   * @param context - Active agent context that supplies the session id
+   * @returns Serialized availability payload, including an alternate-date hint when empty
+   */
   private async getAvailability(
     propertyId: string,
     args: Record<string, unknown>,
@@ -252,6 +273,15 @@ export class ToolHandlers {
     return JSON.stringify(result);
   }
 
+  /**
+   * Resolves a requested slot and creates a booking for the authenticated user.
+   *
+   * @param userId - Authenticated seeker id
+   * @param args - Parsed booking arguments
+   * @param context - Active agent context that binds the booking to one listing and session
+   * @returns Serialized booking result or a structured resolution failure
+   * @throws {Error} when an unexpected booking dependency fails
+   */
   private async createBooking(
     userId: string,
     args: Record<string, unknown>,
@@ -394,6 +424,15 @@ export class ToolHandlers {
     return latest?.id ?? null;
   }
 
+  /**
+   * Cancels the user's selected or inferred booking and clears its session preference.
+   *
+   * @param userId - Authenticated seeker id
+   * @param args - Parsed cancellation arguments
+   * @param context - Active agent context with property and session details
+   * @returns Serialized cancellation result or structured not-found/domain failure
+   * @throws {Error} when an unexpected cancellation dependency fails
+   */
   private async cancelBooking(
     userId: string,
     args: Record<string, unknown>,
@@ -435,6 +474,13 @@ export class ToolHandlers {
   // Escalate unanswered topics and list OPEN lister questions
   // ============================================================================
 
+  /**
+   * Sends an enriched question to the lister unless the listing already answers it.
+   *
+   * @param context - Active agent context with chat history and listing scope
+   * @param args - Parsed lister-question arguments
+   * @returns Serialized escalation, duplicate-question, or already-known result
+   */
   private async sendQuestionToLister(context: AgentContext, args: Record<string, unknown>): Promise<string> {
     const propertyId = this.resolvePropertyId(args, context);
     const rawQuestionText = getStringArg(args, 'question_text');
@@ -534,6 +580,13 @@ export class ToolHandlers {
     });
   }
 
+  /**
+   * Lists unresolved lister questions for the current user, session, and listing.
+   *
+   * @param context - Active agent context that defines the lister-question scope
+   * @param args - Parsed arguments that may contain a property id
+   * @returns Serialized open-question summaries and count
+   */
   private async getOpenListerQuestions(
     context: AgentContext,
     args: Record<string, unknown>,
@@ -560,6 +613,13 @@ export class ToolHandlers {
   // Contact capture and callback requests
   // ============================================================================
 
+  /**
+   * Captures a lead only when the model supplies explicit consent.
+   *
+   * @param userId - Authenticated user id associated with the lead
+   * @param args - Parsed contact and consent arguments
+   * @returns Serialized lead record or validation error
+   */
   private async captureContact(userId: string, args: Record<string, unknown>): Promise<string> {
     const name = getStringArg(args, 'name');
     const email = getStringArg(args, 'email');
@@ -584,6 +644,14 @@ export class ToolHandlers {
     return JSON.stringify({ lead, captured: true });
   }
 
+  /**
+   * Creates a lister callback request for the session-bound property.
+   *
+   * @param userId - Authenticated user id associated with the request
+   * @param args - Parsed callback contact and preference arguments
+   * @param context - Active agent context that binds the request to one listing
+   * @returns Serialized callback request or validation error
+   */
   private async requestCallback(
     userId: string,
     args: Record<string, unknown>,
@@ -612,6 +680,14 @@ export class ToolHandlers {
   // Session context memory and approved lister answers
   // ============================================================================
 
+  /**
+   * Reads session memory together with the property's most recent approved lister answers.
+   *
+   * @param sessionId - Session id requested by the tool call
+   * @param args - Parsed arguments that may contain a property id
+   * @param context - Active agent context that enforces property scope
+   * @returns Serialized memory, approved answers, and model-ready attributes
+   */
   private async readSessionMemory(
     sessionId: string,
     args: Record<string, unknown>,
@@ -641,6 +717,13 @@ export class ToolHandlers {
     });
   }
 
+  /**
+   * Upserts one memory fact and optionally records the conversation's last topic.
+   *
+   * @param sessionId - Session id requested by the tool call
+   * @param args - Parsed fact and optional topic arguments
+   * @returns Serialized updated memory or validation error
+   */
   private async writeSessionMemory(sessionId: string, args: Record<string, unknown>): Promise<string> {
     const attribute = getStringArg(args, 'attribute');
     const value = getStringArg(args, 'value');
@@ -679,6 +762,13 @@ export class ToolHandlers {
     return JSON.stringify({ memory: updated, written: true });
   }
 
+  /**
+   * Retrieves approved lister answers, optionally limited to requested canonical attributes.
+   *
+   * @param propertyId - Listing id bound to the active session
+   * @param args - Parsed attribute-filter arguments
+   * @returns Serialized approved answers and their tool attribute representation
+   */
   private async getApprovedAnswers(propertyId: string, args: Record<string, unknown>): Promise<string> {
     const attributes = getStringArrayArg(args, 'attributes');
 
