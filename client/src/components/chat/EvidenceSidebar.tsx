@@ -16,6 +16,11 @@ export function EvidencePicker({
 }: EvidencePickerProps): React.ReactElement {
   const [selectedId, setSelectedId] = useState('');
 
+  const selected = useMemo(
+    () => EVIDENCE_PROMPTS.find((item) => item.id === selectedId) ?? null,
+    [selectedId],
+  );
+
   const options = useMemo(
     () =>
       EVIDENCE_PROMPTS.map((prompt) => ({
@@ -25,10 +30,11 @@ export function EvidencePicker({
     [],
   );
 
+  const canSend = Boolean(selected?.message.trim());
+
   const handleRun = (): void => {
-    const prompt = EVIDENCE_PROMPTS.find((item) => item.id === selectedId);
-    if (!prompt) return;
-    onSelectPrompt(prompt);
+    if (!selected || !canSend) return;
+    onSelectPrompt(selected);
     setSelectedId('');
   };
 
@@ -36,27 +42,32 @@ export function EvidencePicker({
     <div className={cn('space-y-2', className)}>
       {!compact && (
         <p className="text-[var(--text-xs)] font-bold uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
-          Try this
+          Demo cases
         </p>
       )}
       <p className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
-        Sends as your message on this property — does not switch listings.
+        Implemented checklist (D-01–D-20). Sends as your message on this property — does not switch listings.
       </p>
       <Select
         options={options}
         value={selectedId}
         onChange={setSelectedId}
-        placeholder="Select evidence case…"
+        placeholder="Select demo case…"
         className="!text-[var(--text-sm)]"
       />
+      {selected?.note && (
+        <p className="text-[var(--text-xs)] leading-relaxed text-[var(--color-text-secondary)]">
+          {selected.note}
+        </p>
+      )}
       <Button
         variant="secondary"
         size="sm"
         fullWidth
-        disabled={selectedId.length === 0}
+        disabled={!canSend}
         onClick={handleRun}
       >
-        Send prompt
+        {selected && !canSend ? 'Info only (no send)' : 'Send prompt'}
       </Button>
     </div>
   );
@@ -79,14 +90,14 @@ export function EvidenceSheet({
     <div className="fixed inset-0 z-[var(--z-modal)] lg:hidden" role="presentation">
       <button
         type="button"
-        aria-label="Close evidence sheet"
+        aria-label="Close demo cases sheet"
         className="absolute inset-0 bg-[var(--color-bg-overlay)]"
         onClick={onClose}
       />
       <div className="absolute inset-x-0 bottom-0 max-h-[70vh] overflow-y-auto rounded-t-[var(--radius-sm)] border-t border-[var(--color-border-light)] bg-[var(--color-bg-base)] p-4 shadow-[var(--shadow-modal)]">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold not-italic text-[var(--color-text-primary)]">
-            Try this
+            Demo cases
           </h3>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Close

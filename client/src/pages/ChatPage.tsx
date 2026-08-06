@@ -199,6 +199,7 @@ export function ChatPage(): React.ReactElement {
   const handlePromptSelect = (prompt: EvidencePrompt): void => {
     // Always stay on the active property chat — send as a normal human message.
     // Fixture keys are metadata for the Demo control panel only.
+    if (!prompt.message.trim()) return;
     void handleSend(prompt.message);
   };
 
@@ -252,7 +253,7 @@ export function ChatPage(): React.ReactElement {
             iconOnly
             className="lg:hidden"
             onClick={() => setSheetOpen(true)}
-            aria-label="Try evidence prompt"
+            aria-label="Open demo cases"
           >
             <PanelRightOpen className="h-3.5 w-3.5" strokeWidth={1.5} />
           </Button>
