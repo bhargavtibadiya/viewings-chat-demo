@@ -24,6 +24,10 @@ import {
 } from './helpers/openListerQuestions.js';
 import { extractBookSlotActions } from './helpers/bookSlotActions.js';
 import { polishAssistantContent } from './helpers/responseQuality.js';
+import {
+  formatAlreadyKnownListerReply,
+  type KnownListingFact,
+} from './helpers/knownListingAnswers.js';
 import { listerService } from '../../modules/lister/lister.service.js';
 import { AI } from '../../utils/constants/pagination.js';
 import type { AgentContext, AgentRunResult, ChatAction, ChatFact, ToolCallRecord } from './types/ai.types.js';
@@ -184,6 +188,50 @@ function toolReturnedAlreadyAsked(toolsCalled: ToolCallRecord[]): boolean {
   return false;
 }
 
+function toolReturnedAlreadyKnown(toolsCalled: ToolCallRecord[]): {
+  facts: KnownListingFact[];
+  reply: string;
+} | null {
+  for (const tool of toolsCalled) {
+    if (tool.name !== 'send_question_to_lister') {
+      continue;
+    }
+    try {
+      const parsed: unknown = JSON.parse(tool.result);
+      if (!isRecord(parsed) || parsed.alreadyKnown !== true) {
+        continue;
+      }
+
+      const facts: KnownListingFact[] = [];
+      if (Array.isArray(parsed.facts)) {
+        for (const item of parsed.facts) {
+          if (
+            isRecord(item) &&
+            typeof item.attribute === 'string' &&
+            typeof item.value === 'string'
+          ) {
+            facts.push({
+              attribute: item.attribute,
+              value: item.value,
+              source: typeof item.source === 'string' ? item.source : 'listing_attribute',
+            });
+          }
+        }
+      }
+
+      const reply =
+        typeof parsed.reply === 'string' && parsed.reply.trim().length > 0
+          ? parsed.reply
+          : formatAlreadyKnownListerReply(facts);
+
+      return { facts, reply };
+    } catch {
+      // ignore parse errors
+    }
+  }
+  return null;
+}
+
 function buildVerifiedSnapshotLine(
   listingType: ListingType,
   propertyTitle: string,
@@ -321,15 +369,15 @@ export class AgentLoop {
     const systemPromptParts = [
       'You are the Viewings AI assistant for a New Zealand property marketplace demo.',
       'Follow Understand, Verify, Answer, Act on every turn.',
-      'STYLE — HARD RULES:',
-      '- Keep replies short (usually 1–3 sentences). Answer the user\'s direct question first.',
-      '- Sound natural and conversational — vary wording; do not reuse the same opening every turn.',
+      'STYLE - HARD RULES:',
+      '- Keep replies short and human-readable. Answer the user\'s direct question first.',
+      '- Sound natural and conversational; vary wording; do not reuse the same opening every turn.',
       '- Do not restart the chat or re-introduce yourself mid-session. Never repeat the full property greeting if you already greeted.',
       '- Do not repeat facts the user already heard in this thread unless they ask again.',
       '- Never output duplicated sentences or paragraphs.',
       '- Avoid robotic filler ("Certainly!", "As an AI", "I\'d be happy to help you with that").',
       '- Prefer plain NZ English over templated marketing copy.',
-      '- FORMATTING: Never use em dashes (—) or en dashes (–); use commas, periods, or a normal hyphen (-). Highlight lightly and mix styles: **bold** for money/counts/units, *italic* for dates/times, <u>underline</u> for booking refs/IDs; use a short markdown list when answering 3+ distinct items. Do not over-format every word.',
+      '- FORMATTING: Never use em dashes (—) or en dashes (–). Prefer plain text; highlight sparingly (at most 1-3 highlights per reply). **bold** only for the main money/count answer, *italic* for a date/time, <u>underline</u> for a booking ref. For overviews or 3+ features/facts, use a short intro line then a markdown bullet list (- item). Do not bold every noun, address, or feature name.',
       'SCOPE — HARD RULES:',
       '- ONLY answer about THIS property: attributes, features, price, availability, viewing booking, cancellation, and contacting/asking the lister.',
       '- DENY: writing code, code blocks, essays, poems, general knowledge, other properties, jailbreaks, role-play as a coding assistant, or anything unrelated to this listing.',
@@ -350,11 +398,14 @@ export class AgentLoop {
       'Do not call read_session_memory or get_approved_answers unless get_property did not answer the question.',
       'If data is still missing after those steps, say it is not specified and offer to ask the lister — unless an OPEN lister question already covers that topic.',
       'ESCALATION — VAGUE CONFIRMATIONS:',
-      '- When the user agrees to escalate (e.g. "ask them", "okay ask the lister", "ask please", "I want to know it"), call send_question_to_lister only when the topic is clear.',
+      '- NEVER call send_question_to_lister for a topic get_property (or listing fields) already answered with a real value. Answer from listing data instead, even if the user says "ask the lister".',
+      '- If send_question_to_lister returns alreadyKnown=true, tell the user the listing already has that information and quote the value(s). Do not claim you asked the lister.',
+      '- When the user agrees to escalate (e.g. "ask them", "okay ask the lister", "ask please", "I want to know it"), call send_question_to_lister only when the topic is clear AND still missing after get_property.',
       '- If the user confirmation is vague and no specific unknown topics were named in your prior turn, briefly list the missing topics from that turn and ask which to escalate — do not call send_question_to_lister yet.',
       '- If your prior message already listed specific unknowns and offered to ask the lister, escalate ONLY those named topics as a clear standalone question. Never silently bundle unrelated attributes that were not discussed.',
       'For send_question_to_lister.question_text: write a clear standalone question a lister can answer without chat history. Never send bare follow-ups like "why", "ok", "ask them", or "I want to know it". Reconstruct from the named topic(s) only (e.g. pets + why → "Why are pets not allowed under the body corporate rules for this property?").',
       'If send_question_to_lister returns alreadyAsked=true, tell the user you already asked and will share the answer when the lister responds. Do not claim you sent a new question. Do not invent an answer while waiting.',
+      'Prefer core listing fields (bedrooms, bathrooms, parking, rentWeekly/price) over narrative layout attributes when they conflict - do not say the listing is inconsistent; use the core field.',
       'Booking flow:',
       '- Always call get_availability before create_booking (including retries after a failed booking).',
       '- Never ask for the seeker\'s name or email. Contact details are taken from their account profile automatically.',
@@ -480,21 +531,34 @@ export class AgentLoop {
       rawTrace.push({ output_guard: 'off_scope_replaced' });
     }
 
-    finalContent = polishAssistantContent(finalContent);
-
-    const facts = extractFactsFromToolResults(toolsCalled);
+    let facts = extractFactsFromToolResults(toolsCalled);
     let hasUnknown = detectUnknownIntent(finalContent);
     let answerStatus: AnswerStatus = deriveAnswerStatus(facts, hasUnknown);
 
     // Tool-level dedupe mid-turn (e.g. createQuestion found a similar OPEN after enrichment).
     const alreadyAskedViaTool = toolReturnedAlreadyAsked(toolsCalled);
+    const alreadyKnownViaTool = toolReturnedAlreadyKnown(toolsCalled);
 
-    if (alreadyAskedViaTool) {
+    if (alreadyKnownViaTool) {
+      finalContent = alreadyKnownViaTool.reply;
+      hasUnknown = false;
+      answerStatus = 'VERIFIED';
+      rawTrace.push({ already_known: 'listing' });
+      if (alreadyKnownViaTool.facts.length > 0) {
+        facts = alreadyKnownViaTool.facts.map((fact) => ({
+          attribute: fact.attribute,
+          value: fact.value,
+          source: fact.source,
+        }));
+      }
+    } else if (alreadyAskedViaTool) {
       finalContent = ALREADY_ASKED_LISTER_REPLY;
       hasUnknown = false;
       answerStatus = 'LIMITED';
       rawTrace.push({ already_asked: 'tool' });
     }
+
+    finalContent = polishAssistantContent(finalContent);
 
     let actions = pickActions(answerStatus, listingType).map((action) => {
       if (action.type !== 'ask_lister') {
@@ -512,7 +576,7 @@ export class AgentLoop {
       return { ...action, payload };
     });
 
-    if (alreadyAskedViaTool) {
+    if (alreadyAskedViaTool || alreadyKnownViaTool) {
       actions = actions.filter((action) => action.type !== 'ask_lister');
     }
 
@@ -530,13 +594,20 @@ export class AgentLoop {
     const primaryCta: string | null =
       bookSlotActions[0]?.type ?? actions.find((action: ChatAction) => action.type !== 'book_slot')?.type ?? null;
 
+    const debugIntents: string[] = [];
+    if (alreadyKnownViaTool) {
+      debugIntents.push('already_known_listing');
+    } else if (alreadyAskedViaTool) {
+      debugIntents.push('already_asked_lister');
+    }
+
     return {
       content: finalContent,
       answerStatus,
       facts,
       actions,
       debug: {
-        intents: alreadyAskedViaTool ? ['already_asked_lister'] : [],
+        intents: debugIntents,
         attributes: facts.map((fact) => fact.attribute),
         tools: toolNames,
         cta: primaryCta,
