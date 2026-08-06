@@ -4,17 +4,42 @@
  */
 
 export const SCOPE_REFUSAL =
-  'I can only help with questions about this property — things like price, features, availability, or booking a viewing. What would you like to know?';
+  'I can only help with questions about this property - things like price, features, availability, or booking a viewing. What would you like to know?';
 
-/** Full greeting — only for the first turn of a session. */
-export const GREETING_ACK =
-  'Hi! Ask me anything about this property — price, features, availability, or booking a viewing.';
+/** Opening greetings for a brand-new session (pick one at random). */
+export const OPENING_GREETINGS: readonly string[] = [
+  'Hi! Ask me anything about this property - price, features, availability, or booking a viewing.',
+  'Welcome. I can help with listing details, pricing, or booking a viewing for this property.',
+  'Kia ora. Curious about this place? Ask about features, cost, or available viewing times.',
+  'Hello! I am here for this listing only - features, price, availability, or a viewing booking.',
+  'Good to see you. What would you like to know about this property first?',
+  'Hi there. I can cover the key facts on this listing, or help you book a viewing.',
+];
 
-/** Short ack when the user greets again mid-session. */
-export const GREETING_ACK_RETURNING =
-  "Hi again! Happy to keep going — what would you like to know?";
+/** Opening greetings that include the property title when available. */
+export const OPENING_GREETINGS_WITH_TITLE: readonly string[] = [
+  'Hi! You are looking at **{title}**. Ask about price, features, availability, or booking a viewing.',
+  'Welcome to **{title}**. What would you like to know - details, cost, or viewing times?',
+  'Kia ora. I can help with **{title}**: features, pricing, or booking a viewing.',
+  'Hello! Ready when you are for questions about **{title}**, or to book a viewing.',
+];
 
-export const THANKS_ACK = "You're welcome — anything else about this property?";
+/** Short mid-session greeting acks (pick one at random). */
+export const RETURNING_GREETINGS: readonly string[] = [
+  'Hi again! What would you like to know?',
+  'Hey - still here. What next about this property?',
+  'Hello again. Happy to keep going on this listing.',
+  'Hi! What else can I help with on this property?',
+  'Welcome back. Ask away about this listing.',
+];
+
+/** @deprecated Prefer pickOpeningGreeting() - kept for tests/compat as first pool item. */
+export const GREETING_ACK = OPENING_GREETINGS[0]!;
+
+/** @deprecated Prefer pickReturningGreeting(). */
+export const GREETING_ACK_RETURNING = RETURNING_GREETINGS[0]!;
+
+export const THANKS_ACK = "You're welcome - anything else about this property?";
 
 export const UNCLEAR_ACK =
   "Sorry, I don't quite get that. Could you rephrase your question about this property?";
@@ -24,6 +49,26 @@ export const API_FAILURE_ACK =
 
 export const EMPTY_SLOTS_HINT =
   'No free viewing times in that range. Try another date, or ask me to check a wider window.';
+
+function pickFromPool(pool: readonly string[]): string {
+  const index = Math.floor(Math.random() * pool.length);
+  return pool[index] ?? pool[0]!;
+}
+
+/** Random first-open greeting; uses title variants when a title is provided. */
+export function pickOpeningGreeting(propertyTitle?: string | null): string {
+  const title = propertyTitle?.trim();
+  if (title) {
+    const template = pickFromPool(OPENING_GREETINGS_WITH_TITLE);
+    return template.replaceAll('{title}', title);
+  }
+  return pickFromPool(OPENING_GREETINGS);
+}
+
+/** Random short ack when the user greets again mid-session. */
+export function pickReturningGreeting(): string {
+  return pickFromPool(RETURNING_GREETINGS);
+}
 
 export type InputScopeClass = 'allow' | 'refuse' | 'greeting' | 'thanks' | 'unclear';
 
@@ -250,7 +295,7 @@ export function cannedReplyForScope(
     case 'refuse':
       return SCOPE_REFUSAL;
     case 'greeting':
-      return options.isReturningSession ? GREETING_ACK_RETURNING : GREETING_ACK;
+      return options.isReturningSession ? pickReturningGreeting() : pickOpeningGreeting();
     case 'thanks':
       return THANKS_ACK;
     case 'unclear':

@@ -3,8 +3,11 @@ import { describe, it } from 'node:test';
 import {
   classifyInputScope,
   cannedReplyForScope,
-  GREETING_ACK,
-  GREETING_ACK_RETURNING,
+  OPENING_GREETINGS,
+  OPENING_GREETINGS_WITH_TITLE,
+  pickOpeningGreeting,
+  pickReturningGreeting,
+  RETURNING_GREETINGS,
   hasPriorAssistantTurn,
   looksLikePropertyQuestion,
 } from './scopeGuard.js';
@@ -35,16 +38,28 @@ describe('scopeGuard', () => {
     assert.equal(classifyInputScope('thanks'), 'thanks');
   });
 
-  it('returns full greeting only for new sessions', () => {
-    assert.equal(cannedReplyForScope('greeting'), GREETING_ACK);
-    assert.equal(
-      cannedReplyForScope('greeting', { isReturningSession: false }),
-      GREETING_ACK,
+  it('picks varied opening and returning greetings', () => {
+    const opening = pickOpeningGreeting();
+    assert.ok(OPENING_GREETINGS.includes(opening));
+
+    const withTitle = pickOpeningGreeting('Grey Lynn Villa');
+    assert.ok(withTitle.includes('Grey Lynn Villa'));
+    assert.ok(
+      OPENING_GREETINGS_WITH_TITLE.some((template) =>
+        withTitle.includes(template.split('{title}')[0] ?? ''),
+      ),
     );
-    assert.equal(
-      cannedReplyForScope('greeting', { isReturningSession: true }),
-      GREETING_ACK_RETURNING,
-    );
+
+    const returning = pickReturningGreeting();
+    assert.ok(RETURNING_GREETINGS.includes(returning));
+  });
+
+  it('canned greeting uses the greeting pools', () => {
+    const first = cannedReplyForScope('greeting', { isReturningSession: false });
+    assert.ok(first && OPENING_GREETINGS.includes(first));
+
+    const again = cannedReplyForScope('greeting', { isReturningSession: true });
+    assert.ok(again && RETURNING_GREETINGS.includes(again));
   });
 
   it('detects prior assistant turns for session awareness', () => {
