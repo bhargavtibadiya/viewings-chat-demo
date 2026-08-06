@@ -52,7 +52,7 @@ function mergeMessagesByCreatedAt(messages: IChatMessage[]): IChatMessage[] {
     if (byTime !== 0) {
       return byTime;
     }
-    // Same timestamp: always show USER before ASSISTANT.
+    // [WHY] User messages must precede replies when server timestamps are identical.
     if (a.role !== b.role) {
       if (a.role === 'USER') return -1;
       if (b.role === 'USER') return 1;
@@ -70,7 +70,7 @@ function createPendingUserMessage(sessionId: string, content: string): IChatMess
     answerStatus: null,
     actions: null,
     metadata: null,
-    // Far-future-safe: keep pending at "now" but fulfilled path replaces with server timestamps.
+    // [WHY] The fulfilled action replaces this client timestamp with the server timestamp.
     createdAt: new Date().toISOString(),
   };
 }
@@ -181,8 +181,7 @@ const chatSlice = createSlice({
         const incoming = action.payload.data.messages;
         const pagination = action.payload.data.pagination;
 
-        // Keep optimistic pending user bubbles while a send is in flight so a
-        // background refresh cannot drop/reorder the active turn.
+        // [WHY] Retain pending bubbles so a background refresh cannot drop the active turn.
         const pendingWhileSending =
           state.sendMessageLoading && !before
             ? state.messages.filter((message) => isPendingUserMessage(message))
@@ -246,7 +245,7 @@ const chatSlice = createSlice({
             answerStatus: null,
             actions: null,
             metadata: null,
-            // Ensure USER sorts before ASSISTANT even if clocks match.
+            // [WHY] Offset the fallback timestamp to preserve user-before-assistant ordering.
             createdAt: new Date(
               Math.max(0, new Date(assistantMessage.createdAt).getTime() - 1),
             ).toISOString(),

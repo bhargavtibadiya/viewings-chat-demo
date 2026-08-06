@@ -23,6 +23,12 @@ export interface ISessionMessagesCache {
   fetchedKeys: string[];
 }
 
+/**
+ * Builds the cache key for an initial or historical messages request.
+ *
+ * @param before - Optional cursor identifying the message before the requested page
+ * @returns A stable key for the request's cache entry
+ */
 export function getMessagesFetchKey(before?: string): string {
   return before ? `before:${before}` : CHAT_MESSAGES_FETCH_INITIAL_KEY;
 }

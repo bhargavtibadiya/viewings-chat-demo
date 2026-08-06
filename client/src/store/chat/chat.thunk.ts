@@ -18,6 +18,17 @@ import type {
 } from '@/store/chat/chat.types';
 import { getMessagesFetchKey, CHAT_MESSAGES_DEFAULT_LIMIT } from '@/store/chat/chat.types';
 
+// ============================================================================
+// CHAT THUNKS
+// Coordinates session retrieval, messaging, lister questions, and slot bookings
+// ============================================================================
+
+/**
+ * Retrieves or creates the chat session for a property.
+ *
+ * @param data - Property identifier
+ * @returns A dispatchable action resolving with the session or an API error
+ */
 export const getSessionThunk = createAsyncThunk<
   IGetSessionThunkResponse,
   IGetSessionThunkPayload,
@@ -34,10 +45,17 @@ export const getSessionThunk = createAsyncThunk<
     }
   },
   {
+    // [PERF] Suppress duplicate session requests while the current request is pending.
     condition: (_, { getState }) => !getState().chat.getSessionLoading,
   },
 );
 
+/**
+ * Retrieves an initial or historical page of messages for a chat session.
+ *
+ * @param data - Session identifier and optional pagination configuration
+ * @returns A dispatchable action resolving with messages or an API error
+ */
 export const getMessagesThunk = createAsyncThunk<
   IGetMessagesThunkResponse,
   IGetMessagesThunkPayload,
@@ -59,6 +77,7 @@ export const getMessagesThunk = createAsyncThunk<
       const fetchKey = getMessagesFetchKey(arg.before);
       const cached = state.sessionMessagesCache[arg.sessionId];
 
+      // [PERF] Reuse pages already fetched for this session unless the caller explicitly refreshes them.
       if (!arg.skipCache && cached?.fetchedKeys.includes(fetchKey)) {
         return false;
       }
@@ -75,6 +94,12 @@ export const getMessagesThunk = createAsyncThunk<
   },
 );
 
+/**
+ * Sends a user message to an open chat session.
+ *
+ * @param data - Session identifier and message content
+ * @returns A dispatchable action resolving with the completed turn or an API error
+ */
 export const sendMessageThunk = createAsyncThunk<
   ISendMessageThunkResponse,
   ISendMessageThunkPayload,
@@ -95,6 +120,12 @@ export const sendMessageThunk = createAsyncThunk<
   },
 );
 
+/**
+ * Escalates a chat question to the property's lister.
+ *
+ * @param data - Session identifier, question, and optional canonical attributes
+ * @returns A dispatchable action resolving with the completed turn or an API error
+ */
 export const askListerThunk = createAsyncThunk<
   IAskListerThunkResponse,
   IAskListerThunkPayload,
@@ -104,6 +135,7 @@ export const askListerThunk = createAsyncThunk<
   async (data, { rejectWithValue, dispatch }) => {
     try {
       const response = await chatService.askLister(data);
+      // [WHY] The server may append messages for this action, so refresh the session transcript.
       await dispatch(
         getMessagesThunk({
           sessionId: data.sessionId,
@@ -122,6 +154,12 @@ export const askListerThunk = createAsyncThunk<
   },
 );
 
+/**
+ * Books an available viewing slot from a chat session.
+ *
+ * @param data - Session and availability slot identifiers
+ * @returns A dispatchable action resolving with the completed turn or an API error
+ */
 export const bookSlotThunk = createAsyncThunk<
   IBookSlotThunkResponse,
   IBookSlotThunkPayload,
@@ -131,6 +169,7 @@ export const bookSlotThunk = createAsyncThunk<
   async (data, { rejectWithValue, dispatch }) => {
     try {
       const response = await chatService.bookSlot(data);
+      // [WHY] Booking can add a confirmation message that must appear in the transcript.
       await dispatch(
         getMessagesThunk({
           sessionId: data.sessionId,
