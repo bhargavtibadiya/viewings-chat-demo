@@ -55,6 +55,12 @@ export class ListerService {
     };
   }
 
+  /**
+   * Lists unanswered questions for properties managed by a lister.
+   *
+   * @param listerId - ID of the lister who owns the properties
+   * @returns The lister's questions ordered by status and recency
+   */
   async listQuestionsForLister(listerId: string): Promise<SafeUnansweredQuestion[]> {
     const questions = await prisma.unansweredQuestion.findMany({
       where: {
@@ -70,6 +76,12 @@ export class ListerService {
     return questions.map((question) => this.toSafeQuestion(question));
   }
 
+  /**
+   * Finds recent open questions associated with a property and optional visitor context.
+   *
+   * @param input - Property and optional session or user ownership filters
+   * @returns Candidate questions used to prevent duplicate escalations
+   */
   async listOpenQuestionsForSession(input: {
     propertyId: string;
     sessionId?: string;
@@ -110,6 +122,13 @@ export class ListerService {
     }));
   }
 
+  /**
+   * Creates an unanswered lister question unless an equivalent open question exists.
+   *
+   * @param input - Question details and visitor context
+   * @returns The created or matched question result
+   * @throws {ServiceError} if the property does not exist
+   */
   async createQuestion(input: CreateQuestionInput): Promise<CreateQuestionResult> {
     const property = await prisma.property.findFirst({
       where: { id: input.propertyId, ...notDeleted() },
@@ -146,7 +165,7 @@ export class ListerService {
       }
     }
 
-    // Property-wide exact text guard (legacy): avoid duplicate OPEN rows with identical wording.
+    // [NOTE] Exact text matching preserves duplicate protection for questions created before similarity matching.
     const existingExact = await prisma.unansweredQuestion.findFirst({
       where: {
         propertyId: input.propertyId,
@@ -191,6 +210,15 @@ export class ListerService {
     };
   }
 
+  /**
+   * Publishes a lister's answer and updates related facts and session memory.
+   *
+   * @param listerId - ID of the answering lister
+   * @param questionId - ID of the question to answer
+   * @param dto - Validated answer details
+   * @returns The answered question and its approved-answer ID
+   * @throws {ServiceError} if the question is unavailable to the lister
+   */
   async answerQuestion(
     listerId: string,
     questionId: string,
