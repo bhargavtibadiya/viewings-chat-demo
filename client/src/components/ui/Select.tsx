@@ -19,6 +19,12 @@ interface SelectProps {
   className?: string;
 }
 
+/**
+ * Renders a labeled native select control from application options.
+ *
+ * @param props - Select options, state, and accessibility metadata
+ * @returns A styled select field
+ */
 export function Select({
   options,
   value,

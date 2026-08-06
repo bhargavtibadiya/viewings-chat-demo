@@ -19,6 +19,13 @@ interface TextareaProps {
   className?: string;
 }
 
+/**
+ * Renders a labeled textarea with consistent validation and accessibility wiring.
+ *
+ * @param props - Native-like textarea options and field messaging
+ * @param ref - Reference forwarded to the textarea element
+ * @returns A styled textarea field and optional message slot
+ */
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
   {
     label,

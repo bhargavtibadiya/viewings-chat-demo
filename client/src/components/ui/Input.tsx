@@ -32,6 +32,13 @@ const sizeClasses: Record<ComponentSize, string> = {
   lg: 'min-h-12 px-4 py-3 text-[var(--text-md)] max-sm:text-base',
 };
 
+/**
+ * Renders a labeled input with consistent validation and accessibility wiring.
+ *
+ * @param props - Native-like input options and field messaging
+ * @param ref - Reference forwarded to the input element
+ * @returns A styled input field and optional message slot
+ */
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   {
     type = 'text',
