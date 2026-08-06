@@ -5,7 +5,7 @@ import {
   inferTopicAttributes,
   questionsAreSimilar,
   tokenSimilarity,
-} from './openListerQuestions.js';
+} from '../../../../services/ai/helpers/lister/openListerQuestions.js';
 
 describe('openListerQuestions', () => {
   it('matches exact question text case-insensitively', () => {
