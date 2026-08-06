@@ -25,6 +25,14 @@ const FIXTURES: FixtureEntry[] = [
 ];
 
 export class DemoService {
+  /**
+   * Retrieves recent turn logs for a session owned by the requesting user.
+   *
+   * @param userId - ID of the session owner
+   * @param sessionId - ID of the session to inspect
+   * @returns Sanitized recent turn logs
+   * @throws {ServiceError} if the session is unavailable
+   */
   async getTurnLogs(userId: string, sessionId: string): Promise<DemoTurnsResponse> {
     const session = await prisma.chatSession.findFirst({
       where: { id: sessionId, userId, ...notDeleted() },
@@ -45,6 +53,11 @@ export class DemoService {
     };
   }
 
+  /**
+   * Returns available demo fixtures and the active model identifier.
+   *
+   * @returns Fixture metadata and model name
+   */
   getFixtures(): DemoFixturesResponse {
     let model = env.OPENAI_MODEL;
     try {

@@ -10,6 +10,14 @@ export class DemoController {
     this.demoService = new DemoService();
   }
 
+  /**
+   * Returns recent turn logs for an owned chat session.
+   *
+   * @param req - Authenticated Express request containing the session ID
+   * @param res - Express response used to return turn logs
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   getTurns = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.user) {
@@ -30,6 +38,14 @@ export class DemoController {
     }
   };
 
+  /**
+   * Returns the metadata for available demo fixtures.
+   *
+   * @param _req - Unused Express request
+   * @param res - Express response used to return fixture metadata
+   * @param next - Express error handler
+   * @returns A promise that resolves after the response is sent
+   */
   getFixtures = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = this.demoService.getFixtures();
