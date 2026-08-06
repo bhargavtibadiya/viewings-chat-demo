@@ -57,6 +57,16 @@ const TOPIC_GROUPS: Array<{ attributes: string[]; keywords: string[] }> = [
     ],
   },
   {
+    attributes: ['outdoor_space', 'fencing', 'pets_policy', 'body_corporate_pets'],
+    keywords: [
+      'dog play',
+      'play outside',
+      'dog outside',
+      'pet outside',
+      'pets outside',
+    ],
+  },
+  {
     attributes: ['pets_policy', 'body_corporate_pets'],
     keywords: ['pet', 'pets', 'dog', 'cat', 'animal', 'animals'],
   },
@@ -65,8 +75,21 @@ const TOPIC_GROUPS: Array<{ attributes: string[]; keywords: string[] }> = [
     keywords: ['parking', 'garage', 'carpark', 'car-park', 'carport'],
   },
   {
-    attributes: ['heating', 'cooling', 'insulation'],
-    keywords: ['heating', 'heatpump', 'heat-pump', 'fireplace', 'cooling', 'insulation'],
+    attributes: ['heating', 'insulation', 'heat_pump'],
+    keywords: [
+      'heating',
+      'heatpump',
+      'heat-pump',
+      'heat pump',
+      'fireplace',
+      'insulation',
+      'stay warm',
+      'freeze',
+    ],
+  },
+  {
+    attributes: ['cooling', 'air_conditioning'],
+    keywords: ['cooling', 'air conditioning', 'air-conditioning', 'aircon'],
   },
   {
     attributes: ['fencing', 'outdoor_space'],
@@ -74,11 +97,26 @@ const TOPIC_GROUPS: Array<{ attributes: string[]; keywords: string[] }> = [
   },
   {
     attributes: ['furnishing', 'included_furniture'],
-    keywords: ['furnished', 'furnishing', 'furniture', 'unfurnished'],
+    keywords: [
+      'furnished',
+      'furnishing',
+      'furniture',
+      'unfurnished',
+      'buy a bed',
+      'bed included',
+      'included furniture',
+    ],
   },
   {
     attributes: ['ensuite', 'bathroom_layout'],
-    keywords: ['ensuite', 'en-suite', 'bathroom'],
+    keywords: [
+      'ensuite',
+      'en-suite',
+      'en suite',
+      'bedroom connect',
+      'connect to the bathroom',
+      'bathroom access',
+    ],
   },
   {
     attributes: ['internet', 'fibre_status'],
