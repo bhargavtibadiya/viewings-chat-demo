@@ -30,6 +30,12 @@ const envSchema = z.object({
 
 export type EnvConfig = z.infer<typeof envSchema>;
 
+/**
+ * Parses and validates the process environment used by the server.
+ *
+ * @returns The validated environment configuration
+ * @throws {Error} if any required environment value is invalid
+ */
 function loadEnv(): EnvConfig {
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
@@ -39,4 +45,5 @@ function loadEnv(): EnvConfig {
   return result.data;
 }
 
+// [WARN] validate configuration during module initialization so invalid deployments fail fast.
 export const env = loadEnv();

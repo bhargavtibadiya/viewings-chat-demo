@@ -6,6 +6,11 @@ declare global {
   var prismaGlobal: PrismaClient | undefined;
 }
 
+/**
+ * Creates the Prisma client configured for the application's database connection.
+ *
+ * @returns A configured Prisma client
+ */
 function createPrismaClient(): PrismaClient {
   const adapter = new PrismaPg({
     connectionString: env.DATABASE_URL,
@@ -17,6 +22,7 @@ function createPrismaClient(): PrismaClient {
   });
 }
 
+// [PERF] reuse the client during development hot reloads to avoid exhausting database connections.
 export const prisma = globalThis.prismaGlobal ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') {
