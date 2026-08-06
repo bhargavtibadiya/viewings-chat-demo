@@ -10,6 +10,17 @@ import type {
   IMeThunkResponse,
 } from '@/store/auth/auth.types';
 
+// ============================================================================
+// AUTHENTICATION THUNKS
+// Coordinates credential exchange and persisted-session profile restoration
+// ============================================================================
+
+/**
+ * Authenticates a user with their submitted credentials.
+ *
+ * @param data - Email and password credentials
+ * @returns A dispatchable action resolving with authentication data or an API error
+ */
 export const loginThunk = createAsyncThunk<
   ILoginThunkResponse,
   ILoginThunkPayload,
@@ -24,6 +35,11 @@ export const loginThunk = createAsyncThunk<
   }
 });
 
+/**
+ * Retrieves the profile associated with the current authentication token.
+ *
+ * @returns A dispatchable action resolving with the current user or an API error
+ */
 export const meThunk = createAsyncThunk<
   IMeThunkResponse,
   void,
@@ -40,6 +56,7 @@ export const meThunk = createAsyncThunk<
     }
   },
   {
+    // [PERF] Suppress duplicate profile requests while the current request is pending.
     condition: (_, { getState }) => !getState().auth.meLoading,
   },
 );
