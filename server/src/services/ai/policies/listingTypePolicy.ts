@@ -1,3 +1,9 @@
+/**
+ * Returns whether an attribute key is rental-only.
+ *
+ * @param attribute - Canonical attribute key
+ * @returns True if the attribute must not appear on SALE listings
+ */
 export function rentalOnlyAttribute(attribute: string): boolean {
   const rentalAttributes = [
     'pets_policy',
@@ -10,6 +16,12 @@ export function rentalOnlyAttribute(attribute: string): boolean {
   return rentalAttributes.includes(attribute);
 }
 
+/**
+ * Returns whether an attribute key is sale/body-corporate-only.
+ *
+ * @param attribute - Canonical attribute key
+ * @returns True if the attribute must not appear on RENTAL listings
+ */
 export function saleOnlyAttribute(attribute: string): boolean {
   return (
     attribute === 'body_corporate_pets' ||
@@ -19,6 +31,13 @@ export function saleOnlyAttribute(attribute: string): boolean {
   );
 }
 
+/**
+ * Filters attribute key lists for the active listing type.
+ *
+ * @param attributes - Candidate attribute keys
+ * @param listingType - RENTAL or SALE
+ * @returns Keys allowed for that listing type
+ */
 export function filterAttributesForListingType(
   attributes: string[],
   listingType: 'RENTAL' | 'SALE',
@@ -29,6 +48,13 @@ export function filterAttributesForListingType(
   return attributes.filter((attribute) => !saleOnlyAttribute(attribute));
 }
 
+/**
+ * Filters attribute records by key against listing-type rules.
+ *
+ * @param attributes - Records that expose a `key` field
+ * @param listingType - RENTAL or SALE
+ * @returns Records whose keys are allowed
+ */
 export function filterAttributeRecordsForListingType<T extends { key: string }>(
   attributes: T[],
   listingType: 'RENTAL' | 'SALE',
@@ -44,6 +70,9 @@ export function filterAttributeRecordsForListingType<T extends { key: string }>(
 
 /**
  * Strip listing-type-inappropriate fields from the tool-facing property payload.
+ *
+ * @param property - Property detail used by get_property / tools
+ * @returns Sanitized copy safe for the current listing type
  */
 export function sanitizePropertyDetailForListingType<
   T extends {
@@ -57,6 +86,7 @@ export function sanitizePropertyDetailForListingType<
   const attributes = filterAttributeRecordsForListingType(property.attributes, listingType);
 
   if (listingType === 'SALE') {
+    // [WARN] must null rent/bond on SALE so the model cannot quote rental figures
     return {
       ...property,
       rentWeekly: null,
@@ -71,6 +101,12 @@ export function sanitizePropertyDetailForListingType<
   };
 }
 
+/**
+ * Builds system-prompt guidance for RENTAL vs SALE wording.
+ *
+ * @param listingType - Active listing type for the session property
+ * @returns Multi-line instruction block for the agent system prompt
+ */
 export function buildListingTypeGuidance(listingType: 'RENTAL' | 'SALE'): string {
   if (listingType === 'SALE') {
     return [
