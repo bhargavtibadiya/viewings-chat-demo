@@ -40,6 +40,12 @@ const statusClasses: Record<SemanticStatus, { solid: string; outline: string; gh
   },
 };
 
+/**
+ * Renders a status badge with optional count, indicator, and removal action.
+ *
+ * @param props - Badge appearance, content, and optional interaction
+ * @returns A styled status badge
+ */
 export function Badge({
   variant = 'solid',
   status = 'neutral',

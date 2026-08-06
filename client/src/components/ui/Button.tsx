@@ -39,6 +39,13 @@ const sizeClasses: Record<ComponentSize, string> = {
   lg: 'min-h-[42px] px-6 py-2.5 text-[var(--text-md)]',
 };
 
+/**
+ * Renders a styled button with optional icons and loading state.
+ *
+ * @param props - Button behavior, appearance, and content
+ * @param ref - Reference forwarded to the button element
+ * @returns A button that blocks interaction while loading or disabled
+ */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     variant = 'primary',
@@ -57,6 +64,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   },
   ref,
 ) {
+  // [WHY] loading buttons must not accept duplicate submissions.
   const isDisabled = disabled || loading;
   const hasLabel = Boolean(children);
 

@@ -21,6 +21,12 @@ interface CommandMenuProps {
   className?: string;
 }
 
+/**
+ * Displays a keyboard-navigable command palette for filtering listings.
+ *
+ * @param props - Visibility, searchable items, and close handler
+ * @returns The command palette, or nothing while closed
+ */
 export function CommandMenu({
   open,
   onOpenChange,
@@ -62,6 +68,7 @@ export function CommandMenu({
         onOpenChange(false);
       }
       if (event.key === 'ArrowDown') {
+        // [WHY] prevent page scrolling while arrow keys move the active command.
         event.preventDefault();
         setActiveIndex((current) => Math.min(current + 1, Math.max(filteredItems.length - 1, 0)));
       }
