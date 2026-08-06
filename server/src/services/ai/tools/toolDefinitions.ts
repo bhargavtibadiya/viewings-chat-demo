@@ -1,5 +1,11 @@
 import type OpenAI from 'openai';
 
+// ============================================================================
+// TOOL DEFINITIONS
+// OpenAI function schemas exposed to the model during the agent loop
+// ============================================================================
+
+// [NOTE] schemas must stay in sync with toolHandlers — name, params, and required fields
 export const toolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
