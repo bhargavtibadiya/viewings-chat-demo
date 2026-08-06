@@ -16,6 +16,31 @@ export interface OpenListerQuestionCandidate {
 /** Topic keyword groups → canonical attribute keys they imply. */
 const TOPIC_GROUPS: Array<{ attributes: string[]; keywords: string[] }> = [
   {
+    attributes: ['floor_area_sqm', 'floor_area', 'land_area_sqm'],
+    keywords: [
+      'floor area',
+      'floor_area',
+      'floorarea',
+      'sqm',
+      'm2',
+      'm²',
+      'square metre',
+      'square meter',
+      'square metr',
+      'size of the home',
+      'how big',
+      'how large',
+    ],
+  },
+  {
+    attributes: ['bedrooms'],
+    keywords: ['bedroom', 'bedrooms', 'beds'],
+  },
+  {
+    attributes: ['bathrooms'],
+    keywords: ['bathroom', 'bathrooms', 'baths'],
+  },
+  {
     attributes: ['accessibility', 'step_free_access', 'lift'],
     keywords: [
       'wheelchair',
