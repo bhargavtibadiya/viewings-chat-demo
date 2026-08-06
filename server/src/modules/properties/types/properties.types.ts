@@ -41,7 +41,7 @@ export interface SafeAvailabilitySlot {
   endsAt: string;
   timezone: string;
   isBooked: boolean;
-  /** Human-readable NZ label for the agent and UI, e.g. "Fri 7 Aug 2026, 9:00 am" */
+  // [NOTE] The label uses New Zealand local time for the agent and UI.
   label: string;
 }
 

@@ -80,6 +80,12 @@ export class PropertiesService {
     };
   }
 
+  /**
+   * Lists active properties that match the supplied search and filter options.
+   *
+   * @param filters - Validated property filters and pagination options
+   * @returns Matching properties and pagination metadata
+   */
   async listProperties(filters: PropertyQueryDtoType): Promise<PaginatedPropertiesResponse> {
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 20;
@@ -163,6 +169,13 @@ export class PropertiesService {
     };
   }
 
+  /**
+   * Retrieves one active property with its listing attributes and lister details.
+   *
+   * @param propertyId - ID of the property to retrieve
+   * @returns The safe property detail
+   * @throws {ServiceError} if the property does not exist
+   */
   async getPropertyById(propertyId: string): Promise<SafePropertyDetail> {
     const property = await prisma.property.findFirst({
       where: { id: propertyId, ...notDeleted() },
@@ -179,6 +192,14 @@ export class PropertiesService {
     return this.toSafeDetail(property);
   }
 
+  /**
+   * Lists unbooked viewing slots for an active property within an optional date range.
+   *
+   * @param propertyId - ID of the property whose slots are requested
+   * @param query - Validated start and end date filters
+   * @returns Available viewing slots
+   * @throws {ServiceError} if the property does not exist
+   */
   async getAvailability(
     propertyId: string,
     query: AvailabilityQueryDtoType,
@@ -223,10 +244,22 @@ export class PropertiesService {
     };
   }
 
+  /**
+   * Retrieves property detail for an agent tool invocation.
+   *
+   * @param propertyId - ID of the property to retrieve
+   * @returns The safe property detail
+   */
   async getPropertyForTools(propertyId: string): Promise<SafePropertyDetail> {
     return this.getPropertyById(propertyId);
   }
 
+  /**
+   * Searches active listings for an agent tool invocation.
+   *
+   * @param filters - Supported search filters and result limit
+   * @returns Matching property summaries
+   */
   async searchListings(filters: {
     search?: string;
     listingType?: ListingType;
@@ -245,6 +278,14 @@ export class PropertiesService {
     return result.properties;
   }
 
+  /**
+   * Formats a viewing slot for display in New Zealand local time.
+   *
+   * @param startsAt - Slot start time
+   * @param endsAt - Slot end time
+   * @param timezone - Slot time-zone identifier
+   * @returns Human-readable slot label
+   */
   formatSlotLabel(startsAt: Date, endsAt: Date, timezone: string): string {
     return `${formatNzDateTime(startsAt)} to ${formatNzTime(endsAt, timezone)} (${timezone})`;
   }
