@@ -1,240 +1,238 @@
 
-# **VIEWINGS AI CHAT ASSISTANT** 
+# **VIEWINGS AI CHAT ASSISTANT**
 
-Executive decision deck for development alignment 
+Executive decision deck for development alignment
 
-### **Meeting objective** 
+### **Meeting objective**
 
-Agree the production behaviour for the chat assistant: understand the user, answer from verified sources, and move people toward viewing, booking or contact. 
+Agree the production behaviour for the chat assistant: understand the user, answer from verified sources, and move people toward viewing, booking or contact.
 
-### **Decision required** 
+### **Decision required**
 
-Move from regex-first/LLM-fallback to a hybrid architecture: LLM-led intent + canonical attributes + verified data/tools + CTA rules. 
+Move from regex-first/LLM-fallback to a hybrid architecture: LLM-led intent + canonical attributes + verified data/tools + CTA rules.
 
-_This deck uses Kenil’s test pack as evidence, not as a blame document._ 
+_This deck uses Kenil’s test pack as evidence, not as a blame document._
 
-1/12 
+1/12
 
-Annotation: Open the meeting with the business goal, not with criticism of the current build. 
+Annotation: Open the meeting with the business goal, not with criticism of the current build.
 
-## **Testing shows a pattern, not isolated bugs** 
+## **Testing shows a pattern, not isolated bugs**
 
-Kenil tested natural phrasing, indirect intent, listing type, unknown data and CTA behaviour. 
+Kenil tested natural phrasing, indirect intent, listing type, unknown data and CTA behaviour.
 
-###### **What works sometimes** 
+###### **What works sometimes**
 
-Direct listing facts when phrased simply Some availability / move-in date answers Some heating/cooling and remote-work answers Basic friendly tone in parts of the flow 
+Direct listing facts when phrased simply Some availability / move-in date answers Some heating/cooling and remote-work answers Basic friendly tone in parts of the flow
 
-###### **What fails repeatedly** 
+###### **What fails repeatedly**
 
-Keyword match replaces intent understanding Facts are sometimes asserted without source Sale vs rental rules are mixed CTA sometimes fires before the question is answered 
+Keyword match replaces intent understanding Facts are sometimes asserted without source Sale vs rental rules are mixed CTA sometimes fires before the question is answered
 
-###### **What this means** 
+###### **What this means**
 
-Adding more regex will patch examples but increase brittleness 
+Adding more regex will patch examples but increase brittleness
 
-The right fix is an answer method with grounding + source routing QA must become repeatable, not screenshot-based only 
+The right fix is an answer method with grounding + source routing QA must become repeatable, not screenshot-based only
 
-###### **Evidence categories from Kenil’s pack** 
+###### **Evidence categories from Kenil’s pack**
 
-###### **Intent failures** 
+###### **Intent failures**
 
-bed → bedrooms; dog → pets; ensuite → room counts 
+bed → bedrooms; dog → pets; ensuite → room counts
 
-###### **Grounding failures** 
+###### **Grounding failures**
 
-AI says facts not actually verified 
+AI says facts not actually verified
 
-###### **Listing-type failures** 
+###### **Listing-type failures**
 
-rental-style answers on sale listings 
+rental-style answers on sale listings
 
-###### **CTA failures** 
+###### **CTA failures**
 
-viewing slots before answering accessibility 
+viewing slots before answering accessibility
 
-Annotation: Make it clear this is a systemic pattern. Do not let the discussion become one-off bug fixing. 
+Annotation: Make it clear this is a systemic pattern. Do not let the discussion become one-off bug fixing.
 
-2/12 
+2/12
 
-## **Current system: fast prototype, weak production behaviour** 
+## **Current system: fast prototype, weak production behaviour**
 
-Regex-first with LLM fallback is predictable, but brittle when users ask naturally. 
+Regex-first with LLM fallback is predictable, but brittle when users ask naturally.
 
-###### **User message** 
+###### **User message**
 
-“Do I need to buy a bed?” 
+“Do I need to buy a bed?”
 
-###### **Regex / keyword layer** 
+###### **Regex / keyword layer**
 
-Detects “bed” and routes to bedroom count. **→ →** 
+Detects “bed” and routes to bedroom count. **→ →**
 
-###### **Matched?** 
+###### **Matched?**
 
-Yes → predefined answer No → LLM fallback **→** 
+Yes → predefined answer No → LLM fallback **→**
 
-###### **Response** 
+###### **Response**
 
-“It has 4 bedrooms.” 
+“It has 4 bedrooms.”
 
-###### **Why developers use this** 
+###### **Why developers use this**
 
-**Quick to build Deterministic for simple cases Lower initial backend effort Natural language has many forms Keywords overlap with different meanings Fallback LLM lacks structured context More regex creates more edge cases** 
+**Quick to build Deterministic for simple cases Lower initial backend effort Natural language has many forms Keywords overlap with different meanings Fallback LLM lacks structured context More regex creates more edge cases**
 
-###### **Why it breaks** 
+###### **Why it breaks**
 
-3/12 
+3/12
 
-Annotation: Acknowledge the engineering logic, then show why it cannot carry production UX. 
+Annotation: Acknowledge the engineering logic, then show why it cannot carry production UX.
 
-## **Failure pattern #1: keyword matching misses the real question** 
+## **Failure pattern #1: keyword matching misses the real question**
 
-The assistant must resolve the underlying need before choosing an answer. 
+The assistant must resolve the underlying need before choosing an answer.
 
-###### **“Do I need to buy a bed?”** 
+###### **“Do I need to buy a bed?”**
 
-Current: Wrong route: bedrooms Required: Correct route: furnished / included furniture 
+Current: Wrong route: bedrooms Required: Correct route: furnished / included furniture
 
-###### **“Can my dog play outside?”** 
+###### **“Can my dog play outside?”**
 
-Current: Wrong route: pets allowed Required: Correct route: outdoor space + fencing + pet policy 
+Current: Wrong route: pets allowed Required: Correct route: outdoor space + fencing + pet policy
 
-###### **“Does the bedroom connect to the bathroom?”** 
+###### **“Does the bedroom connect to the bathroom?”**
 
-Current: Wrong route: bedroom/bathroom count Required: Correct route: ensuite / layout 
+Current: Wrong route: bedroom/bathroom count Required: Correct route: ensuite / layout
 
-###### **“Does it stay warm?”** 
+###### **“Does it stay warm?”**
 
-Current: Wrong route: air-conditioning Required: Correct route: heating / insulation / heat pump 
+Current: Wrong route: air-conditioning Required: Correct route: heating / insulation / heat pump
 
-**Core fix: map user language to canonical attributes before answering.** 
+**Core fix: map user language to canonical attributes before answering.**
 
-4/12 
+4/12
 
-Annotation: Use this slide to stop “we’ll add another regex” thinking. The issue is semantic routing. 
+Annotation: Use this slide to stop “we’ll add another regex” thinking. The issue is semantic routing.
 
-## **Failure pattern #2: ungrounded facts and weak listing-type rules** 
+## **Failure pattern #2: ungrounded facts and weak listing-type rules**
 
-The assistant must never state a fact unless it can point to an approved source. 
+The assistant must never state a fact unless it can point to an approved source.
 
-###### **Sale vs rental mismatch** 
+###### **Sale vs rental mismatch**
 
-User asks on a sale listing: “I don’t like pets, is it pet-friendly?” 
+User asks on a sale listing: “I don’t like pets, is it pet-friendly?”
 
-Problem: the assistant answered like a rental policy question. 
+Problem: the assistant answered like a rental policy question.
 
-Required: for sale listings, pet ownership is generally the future owner’s decision, subject to body corporate or restrictions. 
+Required: for sale listings, pet ownership is generally the future owner’s decision, subject to body corporate or restrictions.
 
-###### **Accessibility overconfidence** 
+###### **Accessibility overconfidence**
 
-User asks: “My father uses a wheelchair. Can he visit?” 
+User asks: “My father uses a wheelchair. Can he visit?”
 
-Problem: the assistant assumed access and displayed viewing slots before resolving accessibility. 
+Problem: the assistant assumed access and displayed viewing slots before resolving accessibility.
 
-Required: check accessibility attributes first. If unknown, say so and offer to ask the agent. 
+Required: check accessibility attributes first. If unknown, say so and offer to ask the agent.
 
-##### **Grounding policy** 
+##### **Grounding policy**
 
-###### **Verified** 
+###### **Verified**
 
-Data exists in listing/backend/approved content → answer confidently 
+Data exists in listing/backend/approved content → answer confidently
 
-###### **Limited inference** 
+###### **Limited inference**
 
-Data supports part of answer → be specific and avoid overclaiming 
+Data supports part of answer → be specific and avoid overclaiming
 
-###### **Unknown** 
+###### **Unknown**
 
-No source → say not specified; offer to ask agent; log the gap 
+No source → say not specified; offer to ask agent; log the gap
 
-Annotation: This slide frames the legal/trust risk: confident wrong answers are worse than honest unknowns. 
+Annotation: This slide frames the legal/trust risk: confident wrong answers are worse than honest unknowns.
 
-5/12 
+5/12
 
-## **Required behaviour: Understand → Verify → Answer → Act** 
+## **Required behaviour: Understand → Verify → Answer → Act**
 
-This is the behavioural contract the system must enforce on every turn. 
-
-
+This is the behavioural contract the system must enforce on every turn.
 
 <!-- Start of picture text -->
 1 2<br>Understand → Verify<br>Resolve intent, entities and canonical  Retrieve data from the right source or tool.<br>attributes.<br><!-- End of picture text -->
 
-**Understand** Resolve intent, entities and canonical attributes. 
+**Understand** Resolve intent, entities and canonical attributes.
 
-### **3 4 → Answer → Act** Give the direct answer; do not guess. Attach the most relevant CTA only after answering. 
+### **3 4 → Answer → Act** Give the direct answer; do not guess. Attach the most relevant CTA only after answering
 
-### **Non-negotiable rule** 
+### **Non-negotiable rule**
 
-Answer the user’s underlying need from a known source — and never state a property fact that cannot be traced to that source. 
+Answer the user’s underlying need from a known source — and never state a property fact that cannot be traced to that source.
 
-6/12 
+6/12
 
-Annotation: This is the one-sentence standard the developers should build and test against. 
+Annotation: This is the one-sentence standard the developers should build and test against.
 
-## **Recommended architecture: one orchestrator, multiple verified** 
+## **Recommended architecture: one orchestrator, multiple verified**
 
-## **sources** 
+## **sources**
 
-The LLM understands language; deterministic systems provide facts and perform actions. 
+The LLM understands language; deterministic systems provide facts and perform actions.
 
-###### **User message + context** 
+###### **User message + context**
 
-property_id listing_type session history surface: listing / agent / global 
+property_id listing_type session history surface: listing / agent / global
 
-##### **LLM orchestrator** 
+##### **LLM orchestrator**
 
-Intent Attributes Entities Tool selection **→** Response wording 
+Intent Attributes Entities Tool selection **→** Response wording
 
-#### **→** 
+#### **→**
 
-#### **→** 
+#### **→**
 
-###### **Structured listing data** 
+###### **Structured listing data**
 
-rent, bond, beds, bathrooms, pets, heating, furnishing, parking 
+rent, bond, beds, bathrooms, pets, heating, furnishing, parking
 
-###### **Availability / booking API** 
+###### **Availability / booking API**
 
-**→** real slots, booking, cancellation, callback, agent message 
+**→** real slots, booking, cancellation, callback, agent message
 
-###### **Grounded answer + CTA** 
+###### **Grounded answer + CTA**
 
-Direct answer Supporting detail Next best action 
+Direct answer Supporting detail Next best action
 
-#### **→** 
+#### **→**
 
-###### **Approved content / RAG** 
+###### **Approved content / RAG**
 
-property docs, FAQs, agent services, body corporate rules 
+property docs, FAQs, agent services, body corporate rules
 
-#### **→** 
+#### **→**
 
-**Logging + feedback loop** unanswered questions intent failures conversion drop-offs 
+**Logging + feedback loop** unanswered questions intent failures conversion drop-offs
 
-7/12 
+7/12
 
-Annotation: This is the architecture slide: LLM primary for understanding, but never source of truth for facts/actions. 
+Annotation: This is the architecture slide: LLM primary for understanding, but never source of truth for facts/actions.
 
-## **Canonical attributes: the bridge between natural language and data** Different user phrases should map to standard property attributes before any answer is composed. 
+## **Canonical attributes: the bridge between natural language and data** Different user phrases should map to standard property attributes before any answer is composed
 
-###### **User wording** 
+###### **User wording**
 
-###### **Canonical attribute(s)** 
+###### **Canonical attribute(s)**
 
-“Will I freeze?” / “Does it stay warm?” **heating** “Does it get hot?” / “Is AC available?” **cooling** “Do I need to buy a bed?” **furnishing** “Bedroom connected to bathroom?” **ensuite / layout** “Can my dog play outside?” **outdoor_space + fencing + pets_policy** “Can I work remotely?” **internet + workspace** “Father uses a wheelchair” **accessibility** “Every Friday, what leaves my bank?” **weekly_rent** 
+“Will I freeze?” / “Does it stay warm?” **heating** “Does it get hot?” / “Is AC available?” **cooling** “Do I need to buy a bed?” **furnishing** “Bedroom connected to bathroom?” **ensuite / layout** “Can my dog play outside?” **outdoor_space + fencing + pets_policy** “Can I work remotely?” **internet + workspace** “Father uses a wheelchair” **accessibility** “Every Friday, what leaves my bank?” **weekly_rent**
 
-###### **Key rule** 
+###### **Key rule**
 
-One question can require multiple attributes. Do not force “dog” into pets_policy if the real issue is outdoor space or fencing. 
+One question can require multiple attributes. Do not force “dog” into pets_policy if the real issue is outdoor space or fencing.
 
-8/12 
+8/12
 
-Annotation: This makes developer implementation testable: every answer must show the attribute mapping. 
+Annotation: This makes developer implementation testable: every answer must show the attribute mapping.
 
-## **Source routing and grounding policy** 
+## **Source routing and grounding policy**
 
-Each question type needs an approved source. Unknowns must be handled honestly. 
+Each question type needs an approved source. Unknowns must be handled honestly.
 
 |**Question class**|**Source**|**Fallback behaviour**|||
 |---|---|---|---|---|
@@ -248,57 +246,51 @@ Each question type needs an approved source. Unknowns must be handled honestly.
 |**Of-topic**|No property source|Decline and redirect|||
 |**Source priority when**|**multiple sources exist**<br>**Structured data**|**→**<br>**Approved lister answer**<br>**→**|**Approved document**|**→**<br>**Ask agent**|
 
+9/12
 
+Annotation: The routing table tells developers where each answer must come from, not just how it should sound.
 
-9/12 
+## **Response and CTA logic: answer first, then move the user forward**
 
-Annotation: The routing table tells developers where each answer must come from, not just how it should sound. 
-
-## **Response and CTA logic: answer first, then move the user forward** 
-
-The CTA is conditional on the answer and user intent. It is not bolted onto every response. 
-
-
+The CTA is conditional on the answer and user intent. It is not bolted onto every response.
 
 <!-- Start of picture text -->
 Response formula<br>Direct answer<br>+ useful supporting detail<br>+ one relevant next action<br><!-- End of picture text -->
 
-
-
 <!-- Start of picture text -->
 CTA decision examples<br>Fact answered → View available times<br>Info unknown → Ask agent<br><!-- End of picture text -->
 
-Viewing asked → Show live slots Slot selected → Confirm booking Human requested → Contact / callback Browsing → Save property 
+Viewing asked → Show live slots Slot selected → Confirm booking Human requested → Contact / callback Browsing → Save property
 
-###### **Bad example** 
+###### **Bad example**
 
-User: “Can my dog play outside?” 
+User: “Can my dog play outside?”
 
-###### **Good example** 
+###### **Good example**
 
-The property has a private backyard, and pets are negotiable. The listing does not confirm whether the yard is fully fenced. 
+The property has a private backyard, and pets are negotiable. The listing does not confirm whether the yard is fully fenced.
 
-Assistant: “Yes, pets are allowed.” 
+Assistant: “Yes, pets are allowed.”
 
-Would you like me to ask the agent, or show available viewing times? 
+Would you like me to ask the agent, or show available viewing times?
 
-Problem: answers pet permission, not outdoor space. 
+Problem: answers pet permission, not outdoor space.
 
-Annotation: Use this slide to define the UX standard: answer the question before selling the next step. 
+Annotation: Use this slide to define the UX standard: answer the question before selling the next step.
 
-10/12 
+10/12
 
-## **Acceptance testing: turn Kenil’s examples into a repeatable QA** 
+## **Acceptance testing: turn Kenil’s examples into a repeatable QA**
 
-## **matrix** 
+## **matrix**
 
-Screenshots are evidence; a structured test matrix is how we accept or reject the build. 
+Screenshots are evidence; a structured test matrix is how we accept or reject the build.
 
-###### **Kenil’s 50 categories become test coverage** 
+###### **Kenil’s 50 categories become test coverage**
 
-Examples include: rent without saying “rent”, furnished, ensuite, parking, pets, accessibility, relative dates, mixed intent, typos, Hindi-English, Gujarati-English, long context and follow-ups. 
+Examples include: rent without saying “rent”, furnished, ensuite, parking, pets, accessibility, relative dates, mixed intent, typos, Hindi-English, Gujarati-English, long context and follow-ups.
 
-###### **QA matrix structure** 
+###### **QA matrix structure**
 
 |**ID**|**User message**|**Expected intent**|**Attributes**|**Source**|**Expected CTA**|**Pass/Fail**|
 |---|---|---|---|---|---|---|
@@ -309,57 +301,54 @@ Examples include: rent without saying “rent”, furnished, ensuite, parking, p
 |**Acceptance criteria**||**95%+ correct intent/**|**attribute mapping**||**0 invented property facts**||
 |||**100% bookings only**|**after API success**||**Correct CTA in 95%+ conversations**||
 
+11/12
 
+Annotation: The meeting should end with agreement that acceptance is evidence-based, not demo-based.
 
-11/12 
+## **Decisions to agree with the development team**
 
-Annotation: The meeting should end with agreement that acceptance is evidence-based, not demo-based. 
+These are the build decisions needed to move from prototype behaviour to production behaviour.
 
-## **Decisions to agree with the development team** 
+**1**
 
-These are the build decisions needed to move from prototype behaviour to production behaviour. 
+###### **Demote regex**
 
-**1** 
+Regex remains only for narrow deterministic hooks: phone, email, STOP, booking refs, validation.
 
-###### **Demote regex** 
+**2**
 
-Regex remains only for narrow deterministic hooks: phone, email, STOP, booking refs, validation. 
+###### **LLM-led extraction**
 
-**2** 
+Use structured output for intent, entities, attributes and confidence.
 
-###### **LLM-led extraction** 
+**3**
 
-Use structured output for intent, entities, attributes and confidence. 
+###### **Ground facts**
 
-**3** 
+Every property fact must come from listing data, tools or approved content.
 
-###### **Ground facts** 
+**4**
 
-Every property fact must come from listing data, tools or approved content. 
+###### **Use backend tools**
 
-**4** 
+Bookings, cancellations, callbacks and agent questions require actual API success before confirmation.
 
-###### **Use backend tools** 
+**5**
 
-Bookings, cancellations, callbacks and agent questions require actual API success before confirmation. 
+###### **Maintain state**
 
-**5** 
+Pass listing type, property ID, surface, session context and recent messages on every turn.
 
-###### **Maintain state** 
+**6**
 
-Pass listing type, property ID, surface, session context and recent messages on every turn. 
+###### **Test formally**
 
-**6** 
+Kenil’s cases become the QA suite and acceptance gate.
 
-###### **Test formally** 
+###### **Proposed next step**
 
-Kenil’s cases become the QA suite and acceptance gate. 
+Ask the developers to respond with their revised architecture, tool contracts, implementation estimate, and how they will prove each acceptance criterion.
 
-###### **Proposed next step** 
+12/12
 
-Ask the developers to respond with their revised architecture, tool contracts, implementation estimate, and how they will prove each acceptance criterion. 
-
-12/12 
-
-Annotation: Close by asking for agreement on the method, then request their revised technical plan. 
-
+Annotation: Close by asking for agreement on the method, then request their revised technical plan.

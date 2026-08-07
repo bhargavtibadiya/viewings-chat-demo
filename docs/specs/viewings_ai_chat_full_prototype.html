@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Viewings AI Chat System — Fully Wired Product Prototype</title>
+  <style>
+    :root{
+      --navy:#0b1739;
+      --navy-2:#122452;
+      --ink:#17213b;
+      --muted:#65708b;
+      --line:#dce4f3;
+      --panel:#ffffff;
+      --canvas:#f5f7fb;
+      --blue:#315efb;
+      --blue-soft:#eef3ff;
+      --green:#0a9b66;
+      --green-soft:#eaf9f3;
+      --amber:#c87900;
+      --amber-soft:#fff7e7;
+      --red:#e31937;
+      --red-soft:#fff0f2;
+      --purple:#6d48d7;
+      --purple-soft:#f3efff;
+      --shadow:0 14px 40px rgba(23,33,59,.10);
+      --radius:18px;
+      --radius-sm:12px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:var(--canvas);
+      color:var(--ink);
+    }
+    button,input,textarea,select{font:inherit}
+    button{cursor:pointer}
+    .app{min-height:100vh;display:flex;flex-direction:column}
+    .topbar{
+      height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;
+      justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:40;
+    }
+    .brand{display:flex;align-items:center;gap:12px;font-weight:900;color:var(--navy);letter-spacing:-.02em}
+    .brand-mark{width:40px;height:40px;border-radius:14px;background:linear-gradient(145deg,var(--blue),#6a4bff);color:#fff;display:grid;place-items:center;font-size:14px;box-shadow:0 10px 25px rgba(49,94,251,.28)}
+    .brand small{display:block;font-weight:600;color:var(--muted);font-size:11px;letter-spacing:0}
+    .top-actions{display:flex;align-items:center;gap:10px}
+    .btn{border:0;border-radius:11px;padding:10px 14px;font-weight:800;display:inline-flex;align-items:center;gap:8px;justify-content:center;transition:.18s ease;white-space:nowrap}
+    .btn:hover{transform:translateY(-1px)}
+    .btn.primary{background:var(--navy);color:#fff}
+    .btn.blue{background:var(--blue);color:#fff}
+    .btn.red{background:var(--red);color:#fff}
+    .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+    .btn.soft{background:var(--blue-soft);color:var(--blue)}
+    .btn.green{background:var(--green);color:#fff}
+    .btn.small{padding:8px 11px;font-size:12px;border-radius:9px}
+    .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900}
+    .badge.blue{background:var(--blue-soft);color:var(--blue)}
+    .badge.green{background:var(--green-soft);color:var(--green)}
+    .badge.amber{background:var(--amber-soft);color:var(--amber)}
+    .badge.purple{background:var(--purple-soft);color:var(--purple)}
+    .badge.red{background:var(--red-soft);color:var(--red)}
+    .shell{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:calc(100vh - 72px)}
+    .sidebar{background:#fff;border-right:1px solid var(--line);padding:18px 14px;position:sticky;top:72px;height:calc(100vh - 72px);overflow:auto}
+    .sidebar-label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#8893aa;font-weight:900;margin:14px 11px 8px}
+    .nav-btn{width:100%;border:0;background:transparent;padding:12px;border-radius:12px;display:flex;gap:11px;align-items:center;text-align:left;color:#44506b;font-weight:800;margin-bottom:4px}
+    .nav-btn:hover{background:#f6f8fc}
+    .nav-btn.active{background:var(--blue-soft);color:var(--blue)}
+    .nav-icon{width:30px;height:30px;border-radius:10px;background:#f1f4fa;display:grid;place-items:center;font-size:15px}
+    .nav-btn.active .nav-icon{background:#fff}
+    .sidebar-card{margin:18px 5px 0;padding:14px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(145deg,#f8faff,#fff)}
+    .sidebar-card strong{font-size:13px;display:block;margin-bottom:5px}
+    .sidebar-card p{font-size:11px;color:var(--muted);line-height:1.45;margin:0 0 10px}
+    .main{padding:22px;min-width:0}
+    .surface{display:none;animation:fade .22s ease}
+    .surface.active{display:block}
+    @keyframes fade{from{opacity:.5;transform:translateY(5px)}to{opacity:1;transform:none}}
+    .page-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:18px}
+    .page-head h1{margin:0;font-size:27px;letter-spacing:-.035em;color:var(--navy)}
+    .page-head p{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.5;max-width:760px}
+    .surface-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:18px;align-items:start}
+    .chat-shell{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;min-height:700px;display:flex;flex-direction:column}
+    .chat-header{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.97)}
+    .assistant-id{display:flex;gap:11px;align-items:center}
+    .ai-avatar{width:38px;height:38px;border-radius:13px;background:linear-gradient(145deg,var(--blue),#6947ff);color:#fff;display:grid;place-items:center;font-weight:900}
+    .assistant-id strong{display:block;font-size:14px;color:var(--navy)}
+    .assistant-id span{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+    .context-band{padding:12px 17px;background:#f8faff;border-bottom:1px solid var(--line)}
+    .context-card{display:flex;align-items:center;gap:12px}
+    .property-thumb{width:88px;height:62px;border-radius:11px;overflow:hidden;flex:0 0 auto;border:1px solid rgba(0,0,0,.05)}
+    .property-thumb svg{width:100%;height:100%;display:block}
+    .context-card h3{font-size:13px;margin:0 0 4px;color:var(--navy)}
+    .context-card p{font-size:11px;color:var(--muted);margin:0 0 5px}
+    .meta-row{display:flex;gap:6px;flex-wrap:wrap}
+    .chip{border:1px solid var(--line);background:#fff;color:#42506c;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:800;transition:.16s}
+    button.chip:hover{border-color:#a9b9e6;background:#f7f9ff}
+    .chip.active{border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
+    .quick-row{display:flex;gap:7px;overflow:auto;padding:11px 16px;border-bottom:1px solid var(--line);scrollbar-width:thin}
+    .messages{flex:1;padding:18px;overflow:auto;min-height:410px;max-height:520px;background:linear-gradient(180deg,#fff 0%,#fbfcff 100%)}
+    .message{display:flex;gap:9px;margin:0 0 14px;align-items:flex-start}
+    .message.user{justify-content:flex-end}
+    .bubble{max-width:78%;padding:11px 13px;border-radius:15px;font-size:13px;line-height:1.45;position:relative}
+    .message.bot .bubble{background:#f1f5ff;border:1px solid #dfe8ff;border-top-left-radius:5px}
+    .message.user .bubble{background:var(--navy);color:#fff;border-top-right-radius:5px}
+    .mini-avatar{width:26px;height:26px;border-radius:9px;background:var(--blue);color:#fff;font-size:10px;display:grid;place-items:center;font-weight:900;flex:0 0 auto;margin-top:2px}
+    .message-meta{font-size:9px;color:#8893aa;margin-top:5px}
+    .inline-card{margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;color:var(--ink)}
+    .inline-card strong{font-size:12px;display:block;margin-bottom:5px}
+    .inline-card p{font-size:11px;color:var(--muted);margin:0;line-height:1.4}
+    .cta-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    .typing{display:inline-flex;gap:4px;align-items:center;padding:5px}
+    .typing i{width:6px;height:6px;background:#7784a0;border-radius:50%;display:block;animation:bounce 1s infinite ease-in-out}
+    .typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+    @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}
+    .composer{padding:13px;border-top:1px solid var(--line);background:#fff}
+    .composer-box{display:grid;grid-template-columns:1fr auto;gap:9px;align-items:end}
+    .composer textarea{width:100%;min-height:52px;max-height:110px;resize:vertical;border:1px solid #bed0ff;border-radius:13px;padding:13px;outline:none;color:var(--ink);background:#fff}
+    .composer textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(49,94,251,.1)}
+    .composer-note{font-size:10px;color:#8a94aa;margin-top:7px;display:flex;justify-content:space-between;gap:10px}
+    .side-stack{display:flex;flex-direction:column;gap:14px}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 8px 28px rgba(23,33,59,.06)}
+    .panel h3{font-size:14px;margin:0 0 4px;color:var(--navy)}
+    .panel .sub{font-size:11px;color:var(--muted);line-height:1.45;margin:0 0 13px}
+    .route-step{display:grid;grid-template-columns:30px 1fr;gap:9px;padding:9px 0;border-bottom:1px dashed var(--line)}
+    .route-step:last-child{border-bottom:0}
+    .step-dot{width:28px;height:28px;border-radius:9px;background:#f1f4fa;display:grid;place-items:center;font-size:12px;font-weight:900}
+    .route-step strong{font-size:11px;display:block;margin-bottom:2px}
+    .route-step span{font-size:10px;color:var(--muted);line-height:1.35;display:block}
+    .metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .metric{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fbfcff}
+    .metric b{display:block;font-size:17px;color:var(--navy)}
+    .metric span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:900}
+    .cost-line{height:8px;background:#edf1f8;border-radius:999px;overflow:hidden;margin:9px 0 5px}
+    .cost-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));width:35%;border-radius:999px;transition:.3s}
+    .route-banner{padding:9px 10px;border-radius:11px;background:var(--green-soft);color:var(--green);font-size:11px;font-weight:900;margin-bottom:10px}
+    .search-hero{background:#fff;border:1px solid #b9ceff;border-radius:18px;padding:18px;margin-bottom:14px}
+    .search-bar{display:grid;grid-template-columns:1fr auto;gap:10px}
+    .search-bar input{border:0;background:#f0f3f9;border-radius:12px;padding:14px;outline:none;font-size:13px}
+    .search-chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    .filter-summary{display:flex;gap:6px;flex-wrap:wrap;margin:11px 0 0}
+    .result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+    .property-card{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;transition:.2s}
+    .property-card:hover{transform:translateY(-2px);box-shadow:0 10px 25px rgba(23,33,59,.11)}
+    .property-art{height:110px;background:#d9e5ff;overflow:hidden}
+    .property-art svg{width:100%;height:100%;display:block}
+    .property-body{padding:11px}
+    .property-body strong{display:block;font-size:13px;color:var(--navy)}
+    .property-body small{display:block;color:var(--muted);font-size:10px;margin:3px 0 7px}
+    .property-features{font-size:10px;color:#4f5b75}
+    .property-actions{display:flex;gap:6px;margin-top:9px}
+    .agent-profile{display:flex;gap:13px;align-items:center}
+    .agent-photo{width:70px;height:70px;border-radius:18px;background:linear-gradient(145deg,#ffd7b8,#7b4a3a);display:grid;place-items:center;font-size:34px;overflow:hidden}
+    .agent-profile h3{margin:0 0 3px;font-size:16px}
+    .agent-profile p{margin:0;color:var(--muted);font-size:11px}
+    .mode-toggle{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#f1f4fa;padding:5px;border-radius:12px;margin-top:12px}
+    .mode-toggle button{border:0;background:transparent;padding:9px;border-radius:9px;font-size:11px;font-weight:900;color:#59657d}
+    .mode-toggle button.active{background:#fff;color:var(--blue);box-shadow:0 4px 15px rgba(23,33,59,.08)}
+    .dashboard-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:15px}
+    .stat-card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:15px}
+    .stat-card small{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:900}
+    .stat-card b{display:block;font-size:24px;margin:5px 0;color:var(--navy)}
+    .stat-card span{font-size:10px;color:var(--green);font-weight:800}
+    .dashboard-layout{display:grid;grid-template-columns:1.4fr .8fr;gap:15px}
+    .table-wrap{overflow:auto}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:11px 9px;border-bottom:1px solid var(--line);text-align:left;font-size:11px;vertical-align:top}
+    th{color:#75809a;text-transform:uppercase;font-size:9px;letter-spacing:.08em}
+    td strong{display:block;color:var(--navy);font-size:11px;margin-bottom:3px}
+    .faq-status{font-size:9px;font-weight:900;border-radius:999px;padding:4px 7px;display:inline-flex}
+    .faq-status.approved{background:var(--green-soft);color:var(--green)}
+    .faq-status.pending{background:var(--amber-soft);color:var(--amber)}
+    .faq-status.rejected{background:var(--red-soft);color:var(--red)}
+    .question-list{display:flex;flex-direction:column;gap:8px}
+    .question-item{border:1px solid var(--line);padding:11px;border-radius:12px;background:#fbfcff}
+    .question-item strong{font-size:11px;display:block;color:var(--navy)}
+    .question-item span{font-size:10px;color:var(--muted)}
+    .progress{height:8px;border-radius:999px;background:#edf1f7;overflow:hidden;margin-top:8px}
+    .progress > div{height:100%;background:linear-gradient(90deg,var(--red),var(--amber),var(--green));border-radius:999px}
+    .architecture-map{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}
+    .arch-row{display:grid;grid-template-columns:1fr 42px 1fr 42px 1fr 42px 1fr;gap:7px;align-items:stretch}
+    .arch-col{border:1px solid var(--line);border-radius:15px;padding:13px;background:#fbfcff}
+    .arch-col h3{font-size:13px;margin:0 0 10px;color:var(--navy)}
+    .arch-node{border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px;margin-bottom:8px;font-size:10px;line-height:1.35;cursor:pointer;transition:.16s}
+    .arch-node:hover,.arch-node.active{border-color:var(--blue);box-shadow:0 5px 15px rgba(49,94,251,.12)}
+    .arrow{display:grid;place-items:center;font-size:24px;color:#9aa7c2}
+    .architecture-details{margin-top:14px;border:1px solid var(--line);border-radius:14px;padding:15px;background:#fff}
+    .architecture-details h3{margin:0 0 5px;font-size:14px}
+    .architecture-details p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+    .rule-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+    .rule-card{border:1px solid var(--line);border-radius:13px;padding:12px;background:#fff}
+    .rule-card b{font-size:11px;display:block;margin-bottom:4px;color:var(--navy)}
+    .rule-card span{font-size:10px;color:var(--muted);line-height:1.4}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(7,16,40,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:100}
+    .modal-backdrop.open{display:flex}
+    .modal{width:min(1040px,96vw);max-height:90vh;overflow:hidden;background:#fff;border-radius:20px;box-shadow:0 30px 90px rgba(0,0,0,.3);display:flex;flex-direction:column}
+    .modal-head{display:flex;justify-content:space-between;align-items:center;padding:17px 19px;border-bottom:1px solid var(--line)}
+    .modal-head h2{margin:0;font-size:18px;color:var(--navy)}
+    .close-btn{border:0;background:#f1f4fa;border-radius:10px;width:34px;height:34px;font-weight:900;color:#59657d}
+    .modal-body{padding:16px;overflow:auto}
+    .scenario-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .scenario-search{flex:1;min-width:220px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;outline:none}
+    .scenario-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+    .scenario{border:1px solid var(--line);border-radius:12px;padding:11px;background:#fff;text-align:left;transition:.16s}
+    .scenario:hover{border-color:var(--blue);box-shadow:0 6px 18px rgba(49,94,251,.1)}
+    .scenario small{font-size:9px;text-transform:uppercase;color:var(--blue);font-weight:900;letter-spacing:.06em}
+    .scenario strong{display:block;font-size:11px;margin:5px 0 3px;color:var(--navy);line-height:1.35}
+    .scenario span{font-size:9px;color:var(--muted)}
+    .toast{position:fixed;right:22px;bottom:22px;background:var(--navy);color:#fff;border-radius:12px;padding:12px 15px;box-shadow:var(--shadow);font-size:12px;font-weight:800;transform:translateY(120px);opacity:0;transition:.3s;z-index:120}
+    .toast.show{transform:none;opacity:1}
+    .tour-banner{display:none;align-items:center;gap:10px;background:var(--navy);color:#fff;border-radius:14px;padding:12px 15px;margin-bottom:14px}
+    .tour-banner.show{display:flex}
+    .tour-banner p{margin:0;font-size:11px;line-height:1.4;flex:1}
+    .tour-progress{width:120px;height:7px;border-radius:999px;background:rgba(255,255,255,.2);overflow:hidden}
+    .tour-progress div{height:100%;width:0;background:#fff;transition:.25s}
+    .empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
+    .empty-state b{display:block;color:var(--navy);font-size:15px;margin-bottom:6px}
+    .route-plan{margin-top:10px;border:1px solid var(--line);border-radius:13px;padding:11px;background:#fff}
+    .route-stop{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line)}
+    .route-stop:last-child{border-bottom:0}
+    .route-stop .num{width:25px;height:25px;border-radius:8px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-size:10px;font-weight:900}
+    .route-stop strong{font-size:10px;display:block}
+    .route-stop span{font-size:9px;color:var(--muted)}
+    .route-stop time{font-size:10px;font-weight:900;color:var(--navy)}
+    .confirmation{border:1px solid #a9e2cc;background:var(--green-soft);border-radius:13px;padding:11px;margin-top:10px}
+    .confirmation strong{color:var(--green);font-size:12px}
+    .confirmation p{font-size:10px;color:#34765e;margin:4px 0 0}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
+    .form-grid input,.form-grid textarea,.form-grid select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:11px;outline:none}
+    .form-grid textarea{grid-column:1/-1;min-height:70px;resize:vertical}
+    .full{grid-column:1/-1}
+    .no-scroll{overflow:hidden}
+    @media(max-width:1180px){
+      .surface-layout{grid-template-columns:minmax(0,1fr) 285px}
+      .result-grid{grid-template-columns:repeat(2,1fr)}
+      .dashboard-grid{grid-template-columns:repeat(2,1fr)}
+    }
+    @media(max-width:960px){
+      .shell{grid-template-columns:78px minmax(0,1fr)}
+      .sidebar{padding:12px 8px}
+      .nav-btn{justify-content:center;padding:10px}
+      .nav-btn span:not(.nav-icon),.sidebar-label,.sidebar-card{display:none}
+      .surface-layout{grid-template-columns:1fr}
+      .side-stack{display:grid;grid-template-columns:1fr 1fr}
+      .arch-row{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}
+    }
+    @media(max-width:720px){
+      .topbar{padding:0 12px}.brand-text{display:none}.top-actions .btn.ghost{display:none}
+      .shell{display:block}.sidebar{position:fixed;bottom:0;top:auto;left:0;right:0;height:66px;z-index:50;border-top:1px solid var(--line);border-right:0;display:flex;padding:8px;background:#fff;overflow:auto}
+      .nav-btn{min-width:58px;margin:0 2px}.nav-btn:nth-of-type(n+6){display:none}
+      .main{padding:13px 12px 82px}.page-head{display:block}.page-head h1{font-size:22px}.page-head .btn{margin-top:10px}
+      .side-stack{grid-template-columns:1fr}.chat-shell{min-height:650px}.messages{max-height:470px}.bubble{max-width:88%}
+      .result-grid{grid-template-columns:1fr}.dashboard-grid{grid-template-columns:1fr 1fr}.dashboard-layout{grid-template-columns:1fr}
+      .scenario-grid{grid-template-columns:1fr}.rule-grid{grid-template-columns:1fr}.search-bar{grid-template-columns:1fr}.search-bar .btn{width:100%}
+      .form-grid{grid-template-columns:1fr}.form-grid textarea,.full{grid-column:auto}
+      .modal{max-height:94vh}.tour-progress{display:none}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">AI</div>
+      <div class="brand-text">Viewings AI Chat System<small>Fully wired product behaviour prototype</small></div>
+    </div>
+    <div class="top-actions">
+      <span class="badge green">Provider-neutral architecture</span>
+      <button class="btn ghost" id="openScenarios">Explore 60 scenarios</button>
+      <button class="btn primary" id="startTour">▶ Automated walkthrough</button>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-label">User experiences</div>
+      <button class="nav-btn active" data-surface="global"><span class="nav-icon">⌕</span><span>Global Ask AI</span></button>
+      <button class="nav-btn" data-surface="listing"><span class="nav-icon">⌂</span><span>Listing Chat</span></button>
+      <button class="nav-btn" data-surface="agent"><span class="nav-icon">◎</span><span>Agent AI</span></button>
+      <div class="sidebar-label">Lister & developer views</div>
+      <button class="nav-btn" data-surface="lister"><span class="nav-icon">▦</span><span>Lister Console</span></button>
+      <button class="nav-btn" data-surface="architecture"><span class="nav-icon">⌘</span><span>Architecture</span></button>
+      <div class="sidebar-card">
+        <strong>Core design rule</strong>
+        <p>Answer from verified data. Use AI for interpretation. Use real tools for real actions.</p>
+        <button class="btn soft small" id="showRouting">See routing logic</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="tour-banner" id="tourBanner">
+        <span class="badge blue">LIVE TOUR</span>
+        <p id="tourText">The walkthrough will demonstrate global search, listing Q&A, booking, agent messaging and the lister FAQ loop.</p>
+        <div class="tour-progress"><div id="tourProgress"></div></div>
+        <button class="btn ghost small" id="stopTour">Stop</button>
+      </div>
+
+      <!-- GLOBAL SEARCH -->
+      <section class="surface active" id="surface-global">
+        <div class="page-head">
+          <div>
+            <h1>Global Viewings AI</h1>
+            <p>Search the full platform naturally by location, price, lifestyle, property features and the times a home seeker is actually free to attend viewings.</p>
+          </div>
+          <button class="btn ghost" data-open-library="global">Global search examples</button>
+        </div>
+        <div class="surface-layout">
+          <div>
+            <div class="search-hero">
+              <div class="assistant-id" style="margin-bottom:12px">
+                <div class="ai-avatar">AI</div>
+                <div><strong>Ask Viewings AI</strong><span>Describe the home, timing and lifestyle fit you need.</span></div>
+              </div>
+              <div class="search-bar">
+                <input id="globalSearchInput" value="Show me 3-bedroom homes for sale in Papatoetoe under $500,000 with two bathrooms that I can view next Saturday between 9am and 2pm" />
+                <button class="btn primary" id="globalSearchButton">Search with AI ✦</button>
+              </div>
+              <div class="search-chips">
+                <button class="chip global-suggestion">Pet-friendly rentals under $850</button>
+                <button class="chip global-suggestion">Homes near trains with Saturday viewings</button>
+                <button class="chip global-suggestion">Reduce driving between my saved viewings</button>
+                <button class="chip global-suggestion">Compare my three saved properties</button>
+              </div>
+            </div>
+            <div class="chat-shell">
+              <div class="chat-header">
+                <div class="assistant-id"><div class="ai-avatar">AI</div><div><strong>Ask Viewings AI</strong><span>Whole-platform search and viewing planner</span></div></div>
+                <span class="badge blue">GLOBAL_SEARCH</span>
+              </div>
+              <div class="messages" id="globalMessages"></div>
+              <div class="composer">
+                <div class="composer-box"><textarea id="globalComposer" placeholder="Ask for properties, refine results, compare homes or plan your viewings..."></textarea><button class="btn red" data-send="global">↵</button></div>
+                <div class="composer-note"><span>Natural language → structured filters → live results</span><span>AI is never the property database</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="side-stack">
+            <div class="panel route-panel" data-route-panel="global"></div>
+            <div class="panel metrics-panel" data-metrics-panel="global"></div>
+            <div class="panel">
+              <h3>Best next actions</h3><p class="sub">CTAs change according to the user’s immediate intent.</p>
+              <div class="question-list">
+                <div class="question-item"><strong>Search results shown</strong><span>View properties, refine or save search</span></div>
+                <div class="question-item"><strong>Multiple viewings selected</strong><span>Build route and surface time conflicts</span></div>
+                <div class="question-item"><strong>No exact match</strong><span>Offer closest matches and create an alert</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LISTING CHAT -->
+      <section class="surface" id="surface-listing">
+        <div class="page-head">
+          <div><h1>Listing-specific AI Chat</h1><p>Answers only about the active listing, retrieves live viewing times, books real appointments and escalates unknown information to the correct agent.</p></div>
+          <button class="btn ghost" data-open-library="listing">Listing question examples</button>
+        </div>
+        <div class="surface-layout">
+          <div class="chat-shell">
+            <div class="chat-header">
+              <div class="assistant-id"><div class="ai-avatar">AI</div><div><strong>Ask Viewings AI</strong><span>Chat about this property</span></div></div>
+              <span class="badge purple">LISTING_CHAT</span>
+            </div>
+            <div class="context-band">
+              <div class="context-card">
+                <div class="property-thumb" id="listingThumb"></div>
+                <div><h3>86 Papanui Road, Papatoetoe</h3><p>$650/week · Available 19 August · Rental listing</p><div class="meta-row"><span class="badge blue">3 bedrooms</span><span class="badge blue">1 bathroom</span><span class="badge green">2 car parks</span></div></div>
+              </div>
+            </div>
+            <div class="quick-row">
+              <button class="chip listing-suggestion">Rent and move-in costs</button>
+              <button class="chip listing-suggestion">Pets and outdoor space</button>
+              <button class="chip listing-suggestion">Parking</button>
+              <button class="chip listing-suggestion">Viewing times</button>
+              <button class="chip listing-suggestion">Is it furnished?</button>
+              <button class="chip listing-suggestion">Accessibility</button>
+            </div>
+            <div class="messages" id="listingMessages"></div>
+            <div class="composer">
+              <div class="composer-box"><textarea id="listingComposer" placeholder="Ask anything about this property..."></textarea><button class="btn red" data-send="listing">↵</button></div>
+              <div class="composer-note"><span>Bound to property_id: PROP-086-PAP</span><span>Answer first → relevant CTA second</span></div>
+            </div>
+          </div>
+          <div class="side-stack">
+            <div class="panel route-panel" data-route-panel="listing"></div>
+            <div class="panel metrics-panel" data-metrics-panel="listing"></div>
+            <div class="panel">
+              <h3>Verified property data</h3><p class="sub">Only relevant fields are supplied to the answer route.</p>
+              <div class="meta-row"><span class="chip">Rent $650</span><span class="chip">Bond $2,600</span><span class="chip">Unfurnished</span><span class="chip">Pets negotiable</span><span class="chip">Heat pump</span><span class="chip">Fencing unconfirmed</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- AGENT AI -->
+      <section class="surface" id="surface-agent">
+        <div class="page-head">
+          <div><h1>Agent AI and Human Contact</h1><p>Users can ask AI about an agent’s approved public information or deliberately leave AI mode to send a real message or callback request.</p></div>
+          <button class="btn ghost" data-open-library="agent">Agent question examples</button>
+        </div>
+        <div class="surface-layout">
+          <div class="chat-shell">
+            <div class="chat-header">
+              <div class="assistant-id"><div class="ai-avatar">AI</div><div><strong>Ask Viewings AI</strong><span>Agent information and contact assistant</span></div></div>
+              <span class="badge amber">AGENT_CHAT</span>
+            </div>
+            <div class="context-band">
+              <div class="agent-profile">
+                <div class="agent-photo">👩🏻‍💼</div>
+                <div><h3>Mary Smith</h3><p>Property Manager · East Auckland · English, Hindi</p><div class="meta-row" style="margin-top:7px"><span class="badge green">Verified profile</span><span class="badge blue">18 active listings</span></div></div>
+              </div>
+              <div class="mode-toggle"><button class="active" data-agent-mode="ai">Ask AI about Mary</button><button data-agent-mode="human">Message Mary directly</button></div>
+            </div>
+            <div class="quick-row" id="agentQuickRow">
+              <button class="chip agent-suggestion">What areas does Mary cover?</button>
+              <button class="chip agent-suggestion">Show Mary’s listings</button>
+              <button class="chip agent-suggestion">What services does she provide?</button>
+              <button class="chip agent-suggestion">Request a callback</button>
+            </div>
+            <div class="messages" id="agentMessages"></div>
+            <div class="composer">
+              <div class="composer-box"><textarea id="agentComposer" placeholder="Ask AI about Mary’s public profile, services or listings..."></textarea><button class="btn red" data-send="agent">↵</button></div>
+              <div class="composer-note"><span id="agentModeNote">AI answers only from Mary’s approved public information</span><span>Private calendar and internal notes are protected</span></div>
+            </div>
+          </div>
+          <div class="side-stack">
+            <div class="panel route-panel" data-route-panel="agent"></div>
+            <div class="panel metrics-panel" data-metrics-panel="agent"></div>
+            <div class="panel">
+              <h3>AI versus human</h3><p class="sub">The interface must never make users believe the AI is Mary.</p>
+              <div class="question-list"><div class="question-item"><strong>Ask AI about Mary</strong><span>Public profile, services, areas and current listings</span></div><div class="question-item"><strong>Message Mary directly</strong><span>Collect consent and contact details, then send a real message</span></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LISTER CONSOLE -->
+      <section class="surface" id="surface-lister">
+        <div class="page-head">
+          <div><h1>Lister and Agent Console</h1><p>The other half of the product: verified answers reduce repetitive work, while unresolved and recurring questions improve each listing over time.</p></div>
+          <button class="btn blue" id="simulateQuestion">Simulate a new user question</button>
+        </div>
+        <div class="dashboard-grid">
+          <div class="stat-card"><small>Questions answered automatically</small><b id="statAnswered">1,284</b><span>↑ 18% this month</span></div>
+          <div class="stat-card"><small>Estimated agent time saved</small><b>42.8 hrs</b><span>Based on 2 min per repeat answer</span></div>
+          <div class="stat-card"><small>Approved FAQ hit rate</small><b id="statFaqRate">38%</b><span>Lower cost and faster response</span></div>
+          <div class="stat-card"><small>Escalated to agents</small><b id="statEscalated">64</b><span>Only where human input was needed</span></div>
+        </div>
+        <div class="dashboard-layout">
+          <div class="panel">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><h3>Listing FAQ approval queue</h3><p class="sub">Repeated wording is grouped by meaning. Nothing becomes approved merely because AI said it before.</p></div><span class="badge amber" id="pendingCount">3 pending</span></div>
+            <div class="table-wrap"><table><thead><tr><th>Proposed FAQ</th><th>Evidence</th><th>Frequency</th><th>Status</th><th>Action</th></tr></thead><tbody id="faqTable"></tbody></table></div>
+          </div>
+          <div class="side-stack">
+            <div class="panel">
+              <h3>Top unanswered questions</h3><p class="sub">These expose missing listing data or questions requiring the owner/agent.</p>
+              <div class="question-list" id="unansweredList"></div>
+            </div>
+            <div class="panel">
+              <h3>Listing data completeness</h3><p class="sub">Better structured data means better answers and fewer agent interruptions.</p>
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:900"><span>86 Papanui Road</span><span id="completenessValue">82%</span></div>
+              <div class="progress"><div id="completenessBar" style="width:82%"></div></div>
+              <div class="question-list" style="margin-top:10px"><div class="question-item"><strong>Missing: fencing status</strong><span>Asked 11 times · confirm with owner</span></div><div class="question-item"><strong>Missing: broadband type</strong><span>Asked 4 times · optional field</span></div></div>
+              <button class="btn primary small" style="width:100%;margin-top:10px" id="completeData">Complete missing fields</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ARCHITECTURE -->
+      <section class="surface" id="surface-architecture">
+        <div class="page-head">
+          <div><h1>Required Production Architecture</h1><p>The product is not “regex versus LLM”. It is a layered system that sends each request to the least expensive route that can still meet the quality standard.</p></div>
+          <button class="btn ghost" id="resetArchitecture">Reset highlights</button>
+        </div>
+        <div class="architecture-map">
+          <div class="arch-row">
+            <div class="arch-col"><h3>1. User surfaces</h3><div class="arch-node" data-arch="surfaces">Global Ask AI</div><div class="arch-node" data-arch="surfaces">Listing Chat</div><div class="arch-node" data-arch="surfaces">Agent AI / Human Message</div></div>
+            <div class="arrow">→</div>
+            <div class="arch-col"><h3>2. Deterministic router</h3><div class="arch-node" data-arch="router">Scope and ID validation</div><div class="arch-node" data-arch="router">Button/action bypass</div><div class="arch-node" data-arch="router">Structured field / FAQ check</div></div>
+            <div class="arrow">→</div>
+            <div class="arch-col"><h3>3. Language layer</h3><div class="arch-node" data-arch="llm">Low-cost default LLM</div><div class="arch-node" data-arch="llm">Intent and entities</div><div class="arch-node" data-arch="fallback">Stronger fallback only when required</div></div>
+            <div class="arrow">→</div>
+            <div class="arch-col"><h3>4. Tools and validation</h3><div class="arch-node" data-arch="tools">Property/search/availability APIs</div><div class="arch-node" data-arch="tools">Booking/message/callback APIs</div><div class="arch-node" data-arch="validation">Grounding and success validation</div></div>
+          </div>
+          <div class="architecture-details" id="architectureDetails"><h3>Select a component</h3><p>Click any architecture block to see exactly what it does and why it improves both user experience and token cost.</p></div>
+          <div class="rule-grid">
+            <div class="rule-card"><b>Answer from a source</b><span>Every property or agent fact must be traceable to structured data, approved FAQ, approved document or a successful tool response.</span></div>
+            <div class="rule-card"><b>Real actions require real tools</b><span>A booking, cancellation or message is confirmed only after the API succeeds.</span></div>
+            <div class="rule-card"><b>Answer first, CTA second</b><span>Zero to two contextual actions. No generic booking pressure before the user receives the answer.</span></div>
+            <div class="rule-card"><b>Keep scope isolated</b><span>Listing chat cannot use another listing. Agent AI cannot expose private agent data. Global AI cannot invent results.</span></div>
+            <div class="rule-card"><b>Reuse verified knowledge</b><span>Approved FAQs and structured fields answer repeated questions directly and cheaply.</span></div>
+            <div class="rule-card"><b>Measure everything</b><span>Track route, source, tokens, cost, latency, errors, FAQ savings, escalations and conversions.</span></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- SCENARIO LIBRARY -->
+<div class="modal-backdrop" id="scenarioModal">
+  <div class="modal">
+    <div class="modal-head"><div><h2>60 fully mapped chat scenarios</h2><div style="font-size:11px;color:var(--muted);margin-top:3px">Each scenario demonstrates answer behaviour, source, route, CTA and token discipline.</div></div><button class="close-btn" data-close-modal>×</button></div>
+    <div class="modal-body">
+      <div class="scenario-controls"><input class="scenario-search" id="scenarioSearch" placeholder="Search scenarios: pets, booking, callback, route planning..." /><button class="chip active" data-filter="all">All</button><button class="chip" data-filter="listing">Listing</button><button class="chip" data-filter="global">Global</button><button class="chip" data-filter="agent">Agent</button></div>
+      <div class="scenario-grid" id="scenarioGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ACTION MODAL -->
+<div class="modal-backdrop" id="actionModal">
+  <div class="modal" style="width:min(620px,96vw)">
+    <div class="modal-head"><h2 id="actionTitle">Complete action</h2><button class="close-btn" data-close-action>×</button></div>
+    <div class="modal-body" id="actionBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Action completed</div>
+
+<script>
+const propertySvgs = [
+`<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a7c9ff"/><stop offset="1" stop-color="#eef5ff"/></linearGradient></defs><rect width="320" height="180" fill="url(#g1)"/><rect y="128" width="320" height="52" fill="#8abf78"/><path d="M45 125V72l76-43 78 43v53z" fill="#fff"/><path d="M35 75l86-50 90 50-10 15-80-44-77 44z" fill="#25375d"/><rect x="71" y="88" width="42" height="37" fill="#bedcff"/><rect x="132" y="76" width="43" height="49" fill="#e8b27d"/><rect x="216" y="93" width="64" height="32" rx="3" fill="#f6f6f2"/><path d="M212 93l36-23 36 23" stroke="#394b6b" stroke-width="8" fill="none"/><circle cx="267" cy="40" r="18" fill="#ffe7a6"/></svg>`,
+`<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg"><rect width="320" height="180" fill="#dce8f3"/><rect y="134" width="320" height="46" fill="#75a774"/><rect x="42" y="54" width="235" height="84" rx="3" fill="#f7f3ea"/><rect x="50" y="64" width="220" height="19" fill="#24344f"/><rect x="66" y="91" width="54" height="42" fill="#a9d2ef"/><rect x="137" y="91" width="54" height="42" fill="#a9d2ef"/><rect x="210" y="90" width="40" height="48" fill="#c88a58"/><rect x="18" y="116" width="30" height="18" fill="#4f8052"/><circle cx="32" cy="103" r="22" fill="#679967"/></svg>`,
+`<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffcfb6"/><stop offset="1" stop-color="#ffece1"/></linearGradient></defs><rect width="320" height="180" fill="url(#g3)"/><rect y="130" width="320" height="50" fill="#657b50"/><rect x="40" y="73" width="245" height="62" fill="#2c3547"/><rect x="52" y="88" width="68" height="38" fill="#9cc7df"/><rect x="128" y="88" width="68" height="38" fill="#9cc7df"/><rect x="215" y="79" width="45" height="56" fill="#b87a53"/><path d="M30 76L160 28l135 48" stroke="#171d2b" stroke-width="17" fill="none"/><circle cx="284" cy="38" r="19" fill="#ffd792"/></svg>`,
+`<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg"><rect width="320" height="180" fill="#b8d8ef"/><rect y="130" width="320" height="50" fill="#8bb56b"/><rect x="48" y="54" width="220" height="82" fill="#f3f0e8"/><path d="M35 60L155 15l130 45" stroke="#675347" stroke-width="16" fill="none"/><rect x="70" y="83" width="45" height="44" fill="#93bfd6"/><rect x="127" y="83" width="45" height="44" fill="#93bfd6"/><rect x="195" y="75" width="48" height="61" fill="#a66c4b"/><rect x="12" y="114" width="47" height="22" fill="#577d4e"/></svg>`,
+`<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg"><rect width="320" height="180" fill="#d5e4ff"/><rect y="128" width="320" height="52" fill="#a5b77b"/><rect x="54" y="48" width="214" height="88" rx="4" fill="#fcfcfa"/><rect x="54" y="48" width="214" height="18" fill="#34435d"/><rect x="72" y="82" width="52" height="43" fill="#8fbadc"/><rect x="136" y="82" width="52" height="43" fill="#8fbadc"/><rect x="207" y="78" width="40" height="58" fill="#bc7652"/><path d="M45 50l116-31 117 31" stroke="#233047" stroke-width="13" fill="none"/></svg>`,
+`<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg"><rect width="320" height="180" fill="#cde5e2"/><rect y="132" width="320" height="48" fill="#759664"/><rect x="31" y="69" width="252" height="67" fill="#fff"/><rect x="42" y="85" width="72" height="42" fill="#8fc2c8"/><rect x="126" y="85" width="72" height="42" fill="#8fc2c8"/><rect x="220" y="78" width="42" height="58" fill="#c4895a"/><path d="M20 72L158 25l139 47" stroke="#2d4250" stroke-width="17" fill="none"/></svg>`
+];
+
+const sampleProperties = [
+  {id:'P1',address:'12 Maple Way',suburb:'Papatoetoe',price:'$489,000',type:'Sale',features:'3 bed · 2 bath · 2 car',view:'Sat 9:30am',svg:propertySvgs[0]},
+  {id:'P2',address:'44 Station Road',suburb:'Papatoetoe',price:'$499,000',type:'Sale',features:'3 bed · 2 bath · 1 car',view:'Sat 11:00am',svg:propertySvgs[1]},
+  {id:'P3',address:'8 Kauri Lane',suburb:'Manukau',price:'$495,000',type:'Sale',features:'3 bed · 2 bath · 2 car',view:'Sat 1:00pm',svg:propertySvgs[2]},
+  {id:'P4',address:'5 Tui Crescent',suburb:'Papatoetoe',price:'$475,000',type:'Sale',features:'3 bed · 2 bath · 1 car',view:'Sat 1:45pm',svg:propertySvgs[3]},
+  {id:'P5',address:'21 Marina Drive',suburb:'Half Moon Bay',price:'$820/week',type:'Rental',features:'4 bed · 2 bath · pet friendly',view:'Sat 10:15am',svg:propertySvgs[4]},
+  {id:'P6',address:'72 Great South Road',suburb:'Papakura',price:'$690/week',type:'Rental',features:'3 bed · 1 bath · near train',view:'Sun 12:00pm',svg:propertySvgs[5]}
+];
+
+document.getElementById('listingThumb').innerHTML = propertySvgs[0];
+
+const scenarios = [
+// LISTING 24
+{id:'L01',surface:'listing',title:'Direct weekly rent',user:"What's the rent for this property?",answer:'The rent is $650 per week.',route:'structured',source:'weekly_rent from property PROP-086-PAP',cta:['Book a viewing'],tokens:[0,0],note:'Exact structured fact; no LLM needed when selected from a quick action.'},
+{id:'L02',surface:'listing',title:'Indirect affordability question',user:'How much will I be paying every week?',answer:'The weekly rent is $650. At move-in, the listed bond is $2,600 and the first week’s rent is $650.',route:'llm',source:'Intent interpretation + weekly_rent and bond_amount',cta:['Calculate full move-in cost'],tokens:[340,55],note:'AI interprets the wording; amounts come from structured data.'},
+{id:'L03',surface:'listing',title:'Bed versus bedroom',user:'Do I need to buy a bed?',answer:'Yes. The property is listed as unfurnished, so you would need to provide your own bed and furniture.',route:'llm',source:'furnished_status and included_furniture',cta:['See what is included'],tokens:[360,47],note:'Shows why keyword/regex matching “bed” to bedroom count is wrong.'},
+{id:'L04',surface:'listing',title:'Dog and outside safety',user:'Can my dog play safely outside?',answer:'Pets are negotiable and the property has an outdoor area. The listing does not confirm whether the section is fully fenced.',route:'llm',source:'pets_policy + outdoor_space + missing fencing field',cta:['Ask the agent about fencing'],tokens:[420,64],note:'A multi-attribute suitability question.'},
+{id:'L05',surface:'listing',title:'Bond amount',user:'How much is the bond?',answer:'The listed bond is $2,600, which is four weeks of rent.',route:'faq',source:'Approved listing FAQ linked to bond_amount',cta:['Calculate move-in cost'],tokens:[0,0],note:'Repeated verified question answered directly.'},
+{id:'L06',surface:'listing',title:'Complete move-in cost',user:'What do I need to pay before moving in?',answer:'Based on the listing, the move-in amount is $3,250: a $2,600 bond plus $650 for the first week’s rent.',route:'structured',source:'Deterministic calculation from rent and bond',cta:['Save this breakdown'],tokens:[0,0],note:'Calculations should be deterministic, not generated.'},
+{id:'L07',surface:'listing',title:'Furnished status',user:'Is it furnished?',answer:'No. The property is listed as unfurnished.',route:'faq',source:'Approved FAQ linked to furnished_status',cta:['Ask what appliances are included'],tokens:[0,0],note:'Fast direct answer.'},
+{id:'L08',surface:'listing',title:'Heating and winter comfort',user:'Will this house be warm in winter?',answer:'The property has a heat pump and the listing records ceiling insulation. No additional heating details are confirmed.',route:'llm',source:'heating + insulation fields',cta:['Ask the agent about winter heating'],tokens:[390,62],note:'Avoids unsupported promises about comfort.'},
+{id:'L09',surface:'listing',title:'Ensuite layout',user:'Does the main bedroom have its own bathroom?',answer:'No ensuite is recorded for this listing. It has one shared bathroom.',route:'llm',source:'ensuite=false + bathrooms=1',cta:['View the floor plan'],tokens:[315,39],note:'Understands “own bathroom” as ensuite.'},
+{id:'L10',surface:'listing',title:'Large vehicle parking',user:'Will a work van fit off the street?',answer:'The listing confirms two off-street parking spaces, but it does not provide vehicle dimensions or height clearance.',route:'llm',source:'parking_spaces + missing dimensions',cta:['Ask the agent about van access'],tokens:[410,60],note:'Answers what is known and labels what is not.'},
+{id:'L11',surface:'listing',title:'Wheelchair accessibility',user:'Is this suitable for someone using a wheelchair?',answer:'Accessibility features are not confirmed in the listing, so I cannot verify wheelchair suitability.',route:'llm',source:'accessibility field missing',cta:['Send accessibility question to agent'],tokens:[380,49],note:'No assumptions from photos or generic property type.'},
+{id:'L12',surface:'listing',title:'Internet connection',user:'Does it have fibre broadband?',answer:'The listing does not confirm the broadband connection type.',route:'structured',source:'broadband_type missing',cta:['Ask the agent'],tokens:[0,0],note:'Missing information handled honestly.'},
+{id:'L13',surface:'listing',title:'Pets follow-up',user:'Are pets allowed?',answer:'Pets are negotiable with the owner.',route:'faq',source:'Approved FAQ linked to pets_policy',cta:['Ask about a specific pet'],tokens:[0,0],note:'Approved FAQ response.'},
+{id:'L14',surface:'listing',title:'Contextual pet follow-up',user:'What about a small indoor cat?',answer:'A small indoor cat may be considered, but final approval is required from the owner.',route:'llm',source:'Session topic=pets + pets_policy=negotiable',cta:['Send pet details to agent'],tokens:[300,47],note:'Requires context from the previous turn.'},
+{id:'L15',surface:'listing',title:'Saturday availability',user:'Can I view it next Saturday morning?',answer:'Yes. Available times next Saturday are 9:00am, 10:30am and 11:30am.',route:'tool',source:'Live get_availability(property_id,date_range)',cta:['9:00am','10:30am','11:30am'],tokens:[210,32],note:'AI resolves the date; live slots come from the calendar tool.'},
+{id:'L16',surface:'listing',title:'Book selected slot',user:'10:30 works for me.',answer:'I have selected 10:30am next Saturday. Please confirm your contact details before I create the booking.',route:'tool',source:'Session selected date + slot; booking not yet confirmed',cta:['Confirm and book'],tokens:[240,37],note:'The assistant must not claim the booking exists yet.'},
+{id:'L17',surface:'listing',title:'Booking confirmed',user:'Confirm the booking.',answer:'Your viewing is confirmed for 10:30am next Saturday at 86 Papanui Road. A confirmation has been sent by email and SMS.',route:'tool',source:'Successful create_booking response BK-20491',cta:['Add to calendar','View my bookings'],tokens:[0,0],note:'Confirmation appears only after API success.'},
+{id:'L18',surface:'listing',title:'Cancel a viewing',user:'I need to cancel my Saturday viewing.',answer:'Your 10:30am Saturday viewing has been cancelled. The agent has been notified.',route:'tool',source:'Successful cancel_booking response',cta:['Choose another time'],tokens:[260,35],note:'Ownership is checked before cancellation.'},
+{id:'L19',surface:'listing',title:'Reschedule a viewing',user:'Can I move my booking to the afternoon?',answer:'The available afternoon times are 1:00pm and 2:30pm. Which one works better?',route:'tool',source:'Booking record + live availability',cta:['1:00pm','2:30pm'],tokens:[285,38],note:'Uses current booking context.'},
+{id:'L20',surface:'listing',title:'Multi-part suitability',user:'Is it pet friendly, warm, and is there enough parking for two cars?',answer:'Pets are negotiable. The property has a heat pump and ceiling insulation, and two off-street car parks are recorded.',route:'llm',source:'pets_policy + heating + insulation + parking_spaces',cta:['Book a viewing'],tokens:[470,67],note:'One grounded answer across several attributes.'},
+{id:'L21',surface:'listing',title:'Unknown school zone',user:'Is it in the best school zone?',answer:'I can show the recorded school-zone information, but I cannot rank a school zone as “best”.',route:'llm',source:'Fair-treatment and subjective-ranking guardrail',cta:['View recorded school zones'],tokens:[370,46],note:'Avoids subjective or discriminatory ranking.'},
+{id:'L22',surface:'listing',title:'Noise question',user:'Is the street quiet at night?',answer:'The listing does not contain verified information about night-time noise.',route:'llm',source:'No verified noise source',cta:['Ask the agent','Book an evening viewing'],tokens:[350,43],note:'No invented neighbourhood claim.'},
+{id:'L23',surface:'listing',title:'Send unknown question',user:'Please ask the agent whether the backyard is fully fenced.',answer:'I can send that exact question to the agent. Please confirm the contact method you want them to reply to.',route:'human',source:'Human escalation flow',cta:['Reply by phone','Reply by email'],tokens:[280,43],note:'A real message is sent only after consent and API success.'},
+{id:'L24',surface:'listing',title:'Off-topic question',user:'Who will win the rugby this weekend?',answer:'I can help with this property, viewing times, bookings or contacting the agent.',route:'guardrail',source:'Scope policy',cta:['Ask about this property','View available times'],tokens:[260,39],note:'Stays useful without drifting off-topic.'},
+// GLOBAL 20
+{id:'G01',surface:'global',title:'Detailed sales search',user:'Find me 3-bedroom homes for sale in Papatoetoe under $500,000 with two bathrooms that I can view next Saturday from 9 to 2.',answer:'I found four matching homes with viewing times inside your preferred window.',route:'llm',source:'Structured filter extraction + search_listings + live availability',cta:['View all 4','Plan my viewing route','Save search'],tokens:[520,52],note:'LLM converts natural language into validated filters.'},
+{id:'G02',surface:'global',title:'Time-first search',user:'I am free Saturday morning. What rentals can I see on the North Shore?',answer:'I found seven North Shore rentals with Saturday morning viewing times.',route:'llm',source:'Date/time interpretation + rental search + availability',cta:['View 7 rentals','Add more filters'],tokens:[430,43],note:'Viewing availability is a first-class search filter.'},
+{id:'G03',surface:'global',title:'Pet-friendly rentals',user:'Show pet-friendly rentals under $850 a week.',answer:'I found 18 rentals under $850 where pets are allowed or negotiable.',route:'llm',source:'Search index using price and pets policy',cta:['View results','Refine area','Save search'],tokens:[350,41],note:'Uses structured search, not generated listing suggestions.'},
+{id:'G04',surface:'global',title:'Near train stations',user:'Find three-bedroom homes near a train station.',answer:'I found 12 three-bedroom homes within the configured walking distance of a train station.',route:'llm',source:'Attribute extraction + geo search',cta:['View on map','Add price limit'],tokens:[365,42],note:'Geo distance is computed by the search service.'},
+{id:'G05',surface:'global',title:'Refine active search',user:'Only show the ones in Papatoetoe.',answer:'I refined the current results to four properties in Papatoetoe.',route:'llm',source:'Session search filters updated',cta:['View 4 results','Save search'],tokens:[270,32],note:'Retains the active search context.'},
+{id:'G06',surface:'global',title:'No exact matches',user:'I need a four-bedroom house under $450,000 in Howick.',answer:'There are no exact matches right now. I found three closest options: two are above budget and one is in Pakuranga.',route:'tool',source:'Search result=0 + controlled nearest-match logic',cta:['View closest matches','Create an alert'],tokens:[360,54],note:'Clearly distinguishes exact from near matches.'},
+{id:'G07',surface:'global',title:'Compare saved properties',user:'Compare my three saved homes.',answer:'I compared them on price, bedrooms, bathrooms, parking, viewing time and confirmed property features. One listing does not record fencing status.',route:'tool',source:'Saved property IDs + comparable structured fields',cta:['View comparison','Plan viewings'],tokens:[390,53],note:'Consistent attributes and missing-data labels.'},
+{id:'G08',surface:'global',title:'Viewing route plan',user:'Reduce driving between my saved viewings.',answer:'I created a route that fits three viewings between 9:30am and 1:45pm with travel buffers. No time conflicts were found.',route:'tool',source:'Saved properties + actual events + routing service',cta:['View route','Add to calendar'],tokens:[320,49],note:'Uses real event times and route calculations.'},
+{id:'G09',surface:'global',title:'Route conflict',user:'Can I attend all four of these viewings?',answer:'Three are feasible, but the 11:00am and 11:15am viewings conflict after travel time. I can show alternative slots.',route:'tool',source:'Availability + route timing validation',cta:['Show alternative times','Keep first booking'],tokens:[330,48],note:'Surfaces conflicts rather than promising an impossible itinerary.'},
+{id:'G10',surface:'global',title:'Save interpreted search',user:'Save this search and tell me when something new is listed.',answer:'Your search criteria are ready to save: Papatoetoe, sale, 3+ bedrooms, 2+ bathrooms, maximum $500,000, Saturday viewing preference.',route:'tool',source:'Active structured search state',cta:['Confirm alert','Edit criteria'],tokens:[250,49],note:'Shows interpreted criteria before saving.'},
+{id:'G11',surface:'global',title:'Today’s open homes',user:'What can I view today after 5pm?',answer:'I found five active listings with verified viewing availability after 5:00pm today.',route:'llm',source:'Today resolved in Pacific/Auckland + live availability',cta:['View 5 listings','Map the route'],tokens:[370,42],note:'Relative dates use NZ local time.'},
+{id:'G12',surface:'global',title:'Rental by move-in date',user:'Find rentals available before the first of next month.',answer:'I found 23 rentals with confirmed availability before 1 September.',route:'llm',source:'Date interpretation + available_from filter',cta:['Add area and budget','View results'],tokens:[380,40],note:'Exact date is resolved and shown.'},
+{id:'G13',surface:'global',title:'Lifestyle search',user:'I need a family home with outdoor space and two car parks.',answer:'I found 31 listings with recorded outdoor space and at least two car parks.',route:'llm',source:'Lifestyle wording mapped to structured attributes',cta:['Add location','Add budget'],tokens:[360,39],note:'Interpretation without inventing suitability.'},
+{id:'G14',surface:'global',title:'Accessibility search',user:'Show homes with step-free access.',answer:'I found six listings where step-free access is explicitly recorded.',route:'llm',source:'Accessibility filter using verified fields only',cta:['View 6 homes','Add viewing time'],tokens:[340,39],note:'Does not infer accessibility from photos.'},
+{id:'G15',surface:'global',title:'Commute search',user:'Find rentals within a 30-minute commute of Manukau City Centre.',answer:'I found 14 rentals within the configured 30-minute travel estimate for your selected travel mode.',route:'llm',source:'Geo routing + rental search',cta:['Choose travel mode','View results'],tokens:[410,48],note:'Travel time comes from routing data, not the model.'},
+{id:'G16',surface:'global',title:'Map boundary search',user:'Only show listings inside this area.',answer:'I applied your map boundary and found nine active listings.',route:'structured',source:'Polygon/map selection metadata',cta:['View 9 listings','Save this area'],tokens:[0,0],note:'Explicit map action bypasses the LLM.'},
+{id:'G17',surface:'global',title:'Buy versus rent clarification',user:'Show me three-bedroom places in Flat Bush under $750.',answer:'Do you want properties for rent under $750 per week, or properties for sale under $750,000?',route:'llm',source:'Required intent/price-unit ambiguity',cta:['Rent','Buy'],tokens:[310,42],note:'Asks one focused clarification instead of guessing.'},
+{id:'G18',surface:'global',title:'Broaden search intelligently',user:'There are not enough results. Show nearby options.',answer:'I expanded the area to neighbouring suburbs while keeping your price and bedroom requirements unchanged.',route:'llm',source:'Session filters + controlled geography expansion',cta:['View nearby results','Undo'],tokens:[290,40],note:'Preserves the user’s important constraints.'},
+{id:'G19',surface:'global',title:'Fair-treatment request',user:'Only show me neighbourhoods with a certain type of people.',answer:'I cannot filter homes based on protected personal characteristics. I can help with location, price, commute, schools, transport and property features.',route:'guardrail',source:'NZ fair-treatment policy',cta:['Search by commute','Search by property features'],tokens:[360,58],note:'Redirects to legitimate property criteria.'},
+{id:'G20',surface:'global',title:'Off-topic global request',user:'Write me a birthday poem.',answer:'I can help you search, compare, save or book property viewings on Viewings.',route:'guardrail',source:'Platform scope policy',cta:['Search properties'],tokens:[240,31],note:'Keeps the assistant focused.'},
+// AGENT 16
+{id:'A01',surface:'agent',title:'Agent coverage areas',user:'What areas does Mary cover?',answer:'Mary’s approved profile lists Papatoetoe, Manukau, Flat Bush and the wider East Auckland area.',route:'faq',source:'Approved agent profile FAQ',cta:["View Mary's listings"],tokens:[0,0],note:'Public verified profile information.'},
+{id:'A02',surface:'agent',title:'Agent experience',user:'How much experience does Mary have?',answer:'Mary’s approved profile states that she has eight years of property-management experience.',route:'structured',source:'agent.experience_years',cta:['View her services'],tokens:[0,0],note:'Exact public profile field.'},
+{id:'A03',surface:'agent',title:'Languages spoken',user:'Can Mary speak Hindi?',answer:'Yes. Mary’s approved profile lists English and Hindi.',route:'faq',source:'Approved agent FAQ linked to languages',cta:['Request a callback'],tokens:[0,0],note:'Direct verified answer.'},
+{id:'A04',surface:'agent',title:'Current listings',user:"Show me Mary's current rentals.",answer:'Mary currently has 18 active rental listings. I can filter them by area, rent, bedrooms or viewing time.',route:'tool',source:'get_agent_listings(agent_id,active,rental)',cta:['View all 18','Add filters'],tokens:[280,41],note:'Live listing data.'},
+{id:'A05',surface:'agent',title:'Property management services',user:'What property-management services does she provide?',answer:'Mary’s approved services include tenant placement, rent collection, inspections, maintenance coordination and tenancy administration.',route:'faq',source:'Approved agent services content',cta:['View full services','Request a callback'],tokens:[0,0],note:'Approved reusable content.'},
+{id:'A06',surface:'agent',title:'Management fees',user:'What are her management fees?',answer:'The approved agency information states that management fees start from 6.5% plus GST. The final fee depends on the service package and property.',route:'faq',source:'Approved agency fee FAQ',cta:['View fee inclusions','Ask Mary for a quote'],tokens:[0,0],note:'Provides exact approved wording and qualification.'},
+{id:'A07',surface:'agent',title:'Callback tomorrow',user:'Can Mary call me tomorrow afternoon?',answer:'I can create a callback request for tomorrow afternoon. Please confirm the phone number Mary should use.',route:'human',source:'Callback workflow + date resolution',cta:['Confirm phone','Enter another number'],tokens:[320,44],note:'Does not expose Mary’s private calendar.'},
+{id:'A08',surface:'agent',title:'Send direct message',user:'Tell Mary I want her to manage my rental.',answer:'You are now sending a direct message to Mary, not chatting with AI. Please confirm your contact details and message before I send it.',route:'human',source:'Human messaging workflow',cta:['Review and send'],tokens:[290,48],note:'Explicit AI/human separation.'},
+{id:'A09',surface:'agent',title:'Agent response time',user:'How quickly will Mary reply?',answer:'Mary’s public profile does not promise a fixed response time. I can send your message now and show when it has been delivered.',route:'llm',source:'No approved response-time claim',cta:['Message Mary'],tokens:[330,47],note:'Avoids unsupported promises.'},
+{id:'A10',surface:'agent',title:'Private calendar request',user:'Show me Mary’s full calendar tomorrow.',answer:'I cannot display Mary’s private calendar. I can show public viewing times or create a callback request.',route:'guardrail',source:'Agent privacy policy',cta:['View public times','Request callback'],tokens:[300,44],note:'Protects private agent information.'},
+{id:'A11',surface:'agent',title:'Rental appraisal',user:'Can Mary appraise my rental?',answer:'Yes. Rental appraisals are listed as an approved service. I can collect the property address and preferred contact method.',route:'faq',source:'Approved agent service',cta:['Start appraisal request'],tokens:[0,0],note:'Moves from information to a qualified lead.'},
+{id:'A12',surface:'agent',title:'Selling service',user:'Does Mary sell houses too?',answer:'Mary’s current approved profile is for property management. It does not list residential sales services.',route:'structured',source:'agent.services',cta:['Find a sales agent'],tokens:[0,0],note:'Does not infer services from agency membership.'},
+{id:'A13',surface:'agent',title:'Agent availability',user:'Is Mary free at 3pm tomorrow?',answer:'I cannot expose Mary’s private availability. I can submit a 3:00pm callback preference for her to accept.',route:'guardrail',source:'Privacy + callback tool',cta:['Request 3:00pm callback'],tokens:[315,46],note:'Distinguishes a preference from confirmed availability.'},
+{id:'A14',surface:'agent',title:'Unknown personal detail',user:'Where does Mary live?',answer:'I cannot provide private personal information about an agent. I can help with her professional services, listings or public office details.',route:'guardrail',source:'Privacy policy',cta:['View office details','View listings'],tokens:[290,43],note:'Protects personal information.'},
+{id:'A15',surface:'agent',title:'Office contact',user:'What office does Mary work from?',answer:'Mary’s approved profile lists the Manukau office.',route:'structured',source:'agent.office',cta:['View office details','Message Mary'],tokens:[0,0],note:'Public professional detail.'},
+{id:'A16',surface:'agent',title:'Agent AI off-topic',user:'Can Mary recommend a restaurant?',answer:'I can help with Mary’s property services, listings, viewing arrangements or sending her a message.',route:'guardrail',source:'Agent AI scope policy',cta:['View Mary’s listings'],tokens:[260,39],note:'Stays within the approved scope.'}
+];
+
+const routeDefinitions = {
+ structured:{label:'No LLM · Structured answer',badge:'green',icon:'DB',explain:'The request is explicit and the answer comes directly from structured data, a deterministic calculation or selected UI metadata.'},
+ faq:{label:'Approved FAQ · Direct reuse',badge:'green',icon:'FAQ',explain:'The wording maps to a verified listing or agent FAQ whose dependencies are still valid.'},
+ llm:{label:'Low-cost LLM + verified tools',badge:'blue',icon:'AI',explain:'The model interprets natural language or context, then requests only the relevant verified fields or search tools.'},
+ tool:{label:'Live tool / API action',badge:'purple',icon:'API',explain:'The system uses real availability, booking, search, route or messaging tools. Tool success is validated before confirmation.'},
+ human:{label:'Human escalation workflow',badge:'amber',icon:'H',explain:'The platform does not have a verified answer or a human decision is required. Consent and delivery status are explicit.'},
+ guardrail:{label:'Policy and scope guardrail',badge:'red',icon:'!',explain:'The assistant refuses unsupported, private, discriminatory or off-topic requests and redirects to a useful permitted action.'}
+};
+
+const defaultScenarios = {global:scenarios.find(s=>s.id==='G01'),listing:scenarios.find(s=>s.id==='L03'),agent:scenarios.find(s=>s.id==='A01')};
+let currentSurface='global';
+let activeScenarios={...defaultScenarios};
+let scenarioFilter='all';
+let agentMode='ai';
+let tourTimer=null;
+let tourIndex=0;
+
+function byId(id){return document.getElementById(id)}
+function escapeHtml(str){return String(str).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function showToast(msg){const t=byId('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
+function switchSurface(surface){
+  currentSurface=surface;
+  document.querySelectorAll('.surface').forEach(x=>x.classList.toggle('active',x.id===`surface-${surface}`));
+  document.querySelectorAll('.nav-btn[data-surface]').forEach(x=>x.classList.toggle('active',x.dataset.surface===surface));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+document.querySelectorAll('.nav-btn[data-surface]').forEach(btn=>btn.addEventListener('click',()=>switchSurface(btn.dataset.surface)));
+
+function messageHtml(type,content,extra=''){
+  if(type==='user') return `<div class="message user"><div class="bubble">${content}</div></div>`;
+  return `<div class="message bot"><div class="mini-avatar">AI</div><div class="bubble">${content}${extra}<div class="message-meta">Verified route · just now</div></div></div>`;
+}
+function ctaHtml(ctas,scenario){
+  if(!ctas||!ctas.length)return '';
+  return `<div class="cta-row">${ctas.slice(0,3).map((c,i)=>`<button class="btn ${i===0?'primary':'ghost'} small" data-cta="${escapeHtml(c)}" data-scenario="${scenario.id}">${escapeHtml(c)}</button>`).join('')}</div>`;
+}
+function searchResultsHtml(limit=4){
+  return `<div class="filter-summary"><span class="badge blue">Papatoetoe</span><span class="badge blue">3+ beds</span><span class="badge blue">2+ baths</span><span class="badge blue">≤ $500,000</span><span class="badge green">Sat 9am–2pm</span></div><div class="result-grid">${sampleProperties.slice(0,limit).map((p,i)=>`<div class="property-card"><div class="property-art">${p.svg}</div><div class="property-body"><strong>${p.price}</strong><small>${p.address} · ${p.suburb}</small><div class="property-features">${p.features}<br><b>Viewing: ${p.view}</b></div><div class="property-actions"><button class="btn soft small" data-property="${p.id}">View</button><button class="btn ghost small" data-book-property="${p.id}">Book</button></div></div></div>`).join('')}</div>`;
+}
+function routePlanHtml(){return `<div class="route-plan"><strong style="font-size:11px">Optimised Saturday route</strong>${sampleProperties.slice(0,3).map((p,i)=>`<div class="route-stop"><div class="num">${i+1}</div><div><strong>${p.address}</strong><span>${i===0?'Start':i===1?'18 min drive':'14 min drive'}</span></div><time>${p.view.replace('Sat ','')}</time></div>`).join('')}</div>`}
+function confirmationHtml(kind){
+ if(kind==='booking')return `<div class="confirmation"><strong>✓ Booking confirmed · BK-20491</strong><p>86 Papanui Road · Saturday 10:30am · Confirmation sent by email and SMS.</p></div>`;
+ if(kind==='message')return `<div class="confirmation"><strong>✓ Message delivered to Mary</strong><p>Reference MSG-7914. The user will be notified when Mary replies.</p></div>`;
+ return `<div class="confirmation"><strong>✓ Search alert saved</strong><p>New matching listings will be sent by the selected channel.</p></div>`;
+}
+function renderScenario(surface,scenario,{animate=false}={}){
+  activeScenarios[surface]=scenario;
+  const box=byId(`${surface}Messages`);
+  if(!box)return;
+  let extra='';
+  if(scenario.id==='G01') extra=searchResultsHtml(4)+ctaHtml(scenario.cta,scenario);
+  else if(scenario.id==='G08') extra=routePlanHtml()+ctaHtml(scenario.cta,scenario);
+  else if(scenario.id==='L15') extra=ctaHtml(scenario.cta,scenario);
+  else if(scenario.id==='L17') extra=confirmationHtml('booking')+ctaHtml(scenario.cta,scenario);
+  else if(scenario.id==='A08') extra=ctaHtml(scenario.cta,scenario);
+  else extra=ctaHtml(scenario.cta,scenario);
+  const doRender=()=>{box.innerHTML=messageHtml('user',escapeHtml(scenario.user))+messageHtml('bot',escapeHtml(scenario.answer),extra);box.scrollTop=box.scrollHeight;bindDynamicButtons();updateRoutePanel(surface,scenario);updateMetricsPanel(surface,scenario)};
+  if(animate){box.innerHTML=messageHtml('user',escapeHtml(scenario.user))+`<div class="message bot" id="typing-${surface}"><div class="mini-avatar">AI</div><div class="bubble"><div class="typing"><i></i><i></i><i></i></div></div></div>`;box.scrollTop=box.scrollHeight;setTimeout(doRender,520)}else doRender();
+}
+function updateRoutePanel(surface,s){
+ const r=routeDefinitions[s.route];
+ const el=document.querySelector(`[data-route-panel="${surface}"]`);
+ if(!el)return;
+ el.innerHTML=`<h3>How this answer was produced</h3><p class="sub">The route is visible for the prototype; production logging stores the same trace.</p><div class="route-banner" style="background:var(--${r.badge}-soft);color:var(--${r.badge})">${r.label}</div><div class="route-step"><div class="step-dot">1</div><div><strong>Scope</strong><span>${surface==='global'?'GLOBAL_SEARCH':surface==='listing'?'LISTING_CHAT · PROP-086-PAP':'AGENT_CHAT · AGENT-MARY-01'}</span></div></div><div class="route-step"><div class="step-dot">2</div><div><strong>Route decision</strong><span>${r.explain}</span></div></div><div class="route-step"><div class="step-dot">3</div><div><strong>Source of truth</strong><span>${escapeHtml(s.source)}</span></div></div><div class="route-step"><div class="step-dot">4</div><div><strong>Validation</strong><span>Correct scope, supported claims, tool status and CTA relevance checked before display.</span></div></div>`;
+}
+function updateMetricsPanel(surface,s){
+ const el=document.querySelector(`[data-metrics-panel="${surface}"]`);if(!el)return;
+ const [input,output]=s.tokens;const cost=(input/1e6*.234)+(output/1e6*1.2);const avoided=(s.route==='structured'||s.route==='faq')?100:s.route==='tool'?65:s.route==='llm'?35:20;
+ el.innerHTML=`<h3>Interaction economics</h3><p class="sub">Illustrative using the agreed $0.234 input / $1.20 output per million rates.</p><div class="metric-grid"><div class="metric"><b>${input}</b><span>Input tokens</span></div><div class="metric"><b>${output}</b><span>Output tokens</span></div><div class="metric"><b>${cost===0?'$0.000000':'$'+cost.toFixed(6)}</b><span>Estimated model cost</span></div><div class="metric"><b>${avoided}%</b><span>Cost avoided vs heavy call</span></div></div><div class="cost-line"><div class="cost-fill" style="width:${Math.max(6,100-avoided)}%"></div></div><div style="font-size:10px;color:var(--muted)">${escapeHtml(s.note)}</div>`;
+}
+function bindDynamicButtons(){
+ document.querySelectorAll('[data-cta]').forEach(btn=>btn.onclick=()=>handleCTA(btn.dataset.cta,btn.dataset.scenario));
+ document.querySelectorAll('[data-property]').forEach(btn=>btn.onclick=()=>{switchSurface('listing');renderScenario('listing',scenarios.find(s=>s.id==='L03'),{animate:true});showToast('Opened listing-specific chat')});
+ document.querySelectorAll('[data-book-property]').forEach(btn=>btn.onclick=()=>openBookingModal('Saturday 10:30am'));
+}
+function handleCTA(cta,scenarioId){
+ const s=scenarios.find(x=>x.id===scenarioId);
+ const text=cta.toLowerCase();
+ if(text.includes('book')||/^\d{1,2}:\d{2}/.test(cta)){openBookingModal(cta);return}
+ if(text.includes('ask the agent')||text.includes('send')||text.includes('message mary')||text.includes('pet details')){openMessageModal(s);return}
+ if(text.includes('callback')){openCallbackModal();return}
+ if(text.includes('route')||text.includes('plan')){switchSurface('global');renderScenario('global',scenarios.find(x=>x.id==='G08'),{animate:true});return}
+ if(text.includes('save')||text.includes('alert')||text.includes('confirm alert')){showToast('Search and alert saved successfully');return}
+ if(text.includes('view all')||text.includes('view results')||text.includes('view 4')||text.includes('view closest')){switchSurface('global');renderScenario('global',scenarios.find(x=>x.id==='G01'),{animate:true});return}
+ if(text.includes('view mary')||text.includes('listings')){switchSurface('agent');renderScenario('agent',scenarios.find(x=>x.id==='A04'),{animate:true});return}
+ if(text.includes('calculate')){renderScenario('listing',scenarios.find(x=>x.id==='L06'),{animate:true});return}
+ if(text.includes('another time')||text.includes('alternative')){renderScenario('listing',scenarios.find(x=>x.id==='L19'),{animate:true});return}
+ showToast(`${cta} selected`);
+}
+function openAction(title,html){byId('actionTitle').textContent=title;byId('actionBody').innerHTML=html;byId('actionModal').classList.add('open');document.body.classList.add('no-scroll')}
+function closeAction(){byId('actionModal').classList.remove('open');document.body.classList.remove('no-scroll')}
+function openBookingModal(slot='10:30am'){
+ openAction('Confirm viewing booking',`<div class="inline-card"><strong>86 Papanui Road, Papatoetoe</strong><p>Selected time: ${escapeHtml(slot.includes('am')||slot.includes('pm')?slot:'Saturday 10:30am')}</p></div><div class="form-grid"><input value="Jason Patel" placeholder="Full name"><input value="021 ••• •482" placeholder="Mobile"><input class="full" value="jason@example.com" placeholder="Email"><label class="full" style="font-size:10px;color:var(--muted)"><input type="checkbox" checked> Send confirmation and reminder by SMS and email</label><button class="btn green full" id="confirmBookingButton">Confirm and create booking</button></div>`);
+ setTimeout(()=>{const b=byId('confirmBookingButton');if(b)b.onclick=()=>{byId('actionBody').innerHTML=confirmationHtml('booking')+`<div class="cta-row"><button class="btn primary small" onclick="closeAction()">Done</button><button class="btn ghost small">Add to calendar</button></div>`;showToast('Booking created through the live booking tool')}},0);
+}
+function openMessageModal(s){
+ openAction('Send a real message to the agent',`<div class="route-banner" style="background:var(--amber-soft);color:var(--amber)">You are leaving AI-answer mode and sending a human message.</div><div class="form-grid"><input value="Jason Patel" placeholder="Full name"><input value="021 ••• •482" placeholder="Phone"><input class="full" value="jason@example.com" placeholder="Email"><textarea>${s&&s.user?escapeHtml(s.user):'I would like more information about this property.'}</textarea><label class="full" style="font-size:10px;color:var(--muted)"><input type="checkbox" checked> I consent to Viewings sharing these details with the agent.</label><button class="btn primary full" id="sendMessageButton">Send message to Mary</button></div>`);
+ setTimeout(()=>{const b=byId('sendMessageButton');if(b)b.onclick=()=>{byId('actionBody').innerHTML=confirmationHtml('message')+`<div class="cta-row"><button class="btn primary small" onclick="closeAction()">Done</button></div>`;showToast('Message delivered through the agent messaging tool')}},0);
+}
+function openCallbackModal(){
+ openAction('Request a callback',`<div class="form-grid"><input value="Jason Patel" placeholder="Full name"><input value="021 ••• •482" placeholder="Phone"><select><option>Tomorrow afternoon</option><option>Tomorrow morning</option><option>Next business day</option></select><input value="Regarding 86 Papanui Road" placeholder="Reason"><label class="full" style="font-size:10px;color:var(--muted)"><input type="checkbox" checked> I consent to the agent contacting me.</label><button class="btn primary full" id="callbackButton">Submit callback request</button></div>`);
+ setTimeout(()=>{const b=byId('callbackButton');if(b)b.onclick=()=>{byId('actionBody').innerHTML=`<div class="confirmation"><strong>✓ Callback request sent</strong><p>Mary received your preferred time and masked contact details. This is a request, not a confirmed appointment.</p></div><div class="cta-row"><button class="btn primary small" onclick="closeAction()">Done</button></div>`;showToast('Callback request sent')}},0);
+}
+window.closeAction=closeAction;
+document.querySelectorAll('[data-close-action]').forEach(b=>b.onclick=closeAction);
+
+function interpretCustom(surface,text){
+ const q=text.toLowerCase();let candidates=scenarios.filter(s=>s.surface===surface);let found;
+ const map=[
+  [/rent|weekly|paying every week/,surface==='global'?'G03':'L01'],[/bond|move.?in/, 'L06'],[/bed\b|furnish/,'L03'],[/dog|cat|pet/,'L04'],[/park|van|car/,'L10'],[/warm|heat|winter/,'L08'],[/wheelchair|step-free|accessible/,surface==='global'?'G14':'L11'],[/saturday|viewing time|available time/,surface==='global'?'G02':'L15'],[/book|10:30/,'L16'],[/cancel/,'L18'],[/resched|afternoon/,'L19'],[/fenc/,'L23'],[/compare/,'G07'],[/route|driving/,'G08'],[/save|alert/,'G10'],[/papatoetoe|three-bedroom|3-bedroom|under \$500/, 'G01'],[/areas|cover/,'A01'],[/experience/,'A02'],[/hindi|language/,'A03'],[/listings/,'A04'],[/fees/,'A06'],[/callback|call me/,'A07'],[/manage my rental|direct message/,'A08'],[/calendar|free at/,'A13']
+ ];
+ for(const [regex,id] of map){if(regex.test(q)){found=scenarios.find(s=>s.id===id&&s.surface===surface)||candidates.find(s=>s.id===id);if(found)break}}
+ if(!found) found=candidates[candidates.length-1];
+ found={...found,user:text};return found;
+}
+function sendFromComposer(surface){
+ const input=byId(`${surface}Composer`);const text=input.value.trim();if(!text)return;input.value='';const s=interpretCustom(surface,text);renderScenario(surface,s,{animate:true});
+}
+document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>sendFromComposer(b.dataset.send));
+['global','listing','agent'].forEach(surface=>byId(`${surface}Composer`).addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendFromComposer(surface)}}));
+
+byId('globalSearchButton').onclick=()=>{const text=byId('globalSearchInput').value.trim();renderScenario('global',{...interpretCustom('global',text),id:'G01',user:text},{animate:true})};
+document.querySelectorAll('.global-suggestion').forEach(b=>b.onclick=()=>{byId('globalSearchInput').value=b.textContent;byId('globalSearchButton').click()});
+document.querySelectorAll('.listing-suggestion').forEach(b=>b.onclick=()=>{const map={'Rent and move-in costs':'L06','Pets and outdoor space':'L04','Parking':'L10','Viewing times':'L15','Is it furnished?':'L07','Accessibility':'L11'};renderScenario('listing',scenarios.find(s=>s.id===map[b.textContent]),{animate:true})});
+document.querySelectorAll('.agent-suggestion').forEach(b=>b.onclick=()=>{const map={"What areas does Mary cover?":'A01',"Show Mary’s listings":'A04',"What services does she provide?":'A05',"Request a callback":'A07'};renderScenario('agent',scenarios.find(s=>s.id===map[b.textContent]),{animate:true})});
+
+// Agent mode switch
+document.querySelectorAll('[data-agent-mode]').forEach(b=>b.onclick=()=>{
+ agentMode=b.dataset.agentMode;document.querySelectorAll('[data-agent-mode]').forEach(x=>x.classList.toggle('active',x===b));
+ const input=byId('agentComposer');const note=byId('agentModeNote');
+ if(agentMode==='human'){input.placeholder='Write the message that will be sent directly to Mary...';note.textContent='Human message mode: consent and delivery status are required';byId('agentQuickRow').innerHTML='<button class="chip" id="messageAboutListing">Message about this listing</button><button class="chip" id="requestCallbackQuick">Request a callback</button>';byId('messageAboutListing').onclick=()=>openMessageModal();byId('requestCallbackQuick').onclick=openCallbackModal;openMessageModal();}
+ else{input.placeholder='Ask AI about Mary’s public profile, services or listings...';note.textContent='AI answers only from Mary’s approved public information';location.reload?null:null;byId('agentQuickRow').innerHTML='<button class="chip agent-suggestion">What areas does Mary cover?</button><button class="chip agent-suggestion">Show Mary’s listings</button><button class="chip agent-suggestion">What services does she provide?</button><button class="chip agent-suggestion">Request a callback</button>';document.querySelectorAll('.agent-suggestion').forEach(btn=>btn.onclick=()=>{const map={"What areas does Mary cover?":'A01',"Show Mary’s listings":'A04',"What services does she provide?":'A05',"Request a callback":'A07'};renderScenario('agent',scenarios.find(s=>s.id===map[btn.textContent]),{animate:true})});}
+});
+
+// Scenario library
+function renderScenarioLibrary(){
+ const q=byId('scenarioSearch').value.toLowerCase();const list=scenarios.filter(s=>(scenarioFilter==='all'||s.surface===scenarioFilter)&&(`${s.title} ${s.user} ${s.answer} ${s.note}`).toLowerCase().includes(q));
+ byId('scenarioGrid').innerHTML=list.map(s=>`<button class="scenario" data-scenario-open="${s.id}"><small>${s.id} · ${s.surface}</small><strong>${escapeHtml(s.title)}</strong><span>${escapeHtml(s.user)}</span></button>`).join('');
+ document.querySelectorAll('[data-scenario-open]').forEach(b=>b.onclick=()=>{const s=scenarios.find(x=>x.id===b.dataset.scenarioOpen);closeScenarioModal();switchSurface(s.surface);renderScenario(s.surface,s,{animate:true})});
+}
+function openScenarioModal(filter='all'){scenarioFilter=filter;byId('scenarioModal').classList.add('open');document.body.classList.add('no-scroll');document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x.dataset.filter===filter));renderScenarioLibrary()}
+function closeScenarioModal(){byId('scenarioModal').classList.remove('open');document.body.classList.remove('no-scroll')}
+byId('openScenarios').onclick=()=>openScenarioModal('all');document.querySelectorAll('[data-open-library]').forEach(b=>b.onclick=()=>openScenarioModal(b.dataset.openLibrary));document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=closeScenarioModal);byId('scenarioSearch').oninput=renderScenarioLibrary;document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{scenarioFilter=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===b));renderScenarioLibrary()});
+
+// Lister console
+const faqRows=[
+ {q:'Is the backyard fully fenced?',e:'Fencing field currently missing',n:11,status:'pending'},
+ {q:'Is a washing machine included?',e:'Included appliances: washing machine',n:8,status:'pending'},
+ {q:'Can I keep a small indoor cat?',e:'Pets negotiable; owner approval required',n:7,status:'pending'},
+ {q:'How much is the bond?',e:'Bond field: $2,600',n:26,status:'approved'},
+ {q:'Is the property furnished?',e:'Furnished status: unfurnished',n:19,status:'approved'}
+];
+function renderFaqTable(){
+ byId('faqTable').innerHTML=faqRows.map((r,i)=>`<tr><td><strong>${escapeHtml(r.q)}</strong><span style="color:var(--muted)">${escapeHtml(r.e)}</span></td><td>${r.status==='pending'?'Needs verification':'Linked to source'}</td><td>${r.n} asks</td><td><span class="faq-status ${r.status}">${r.status}</span></td><td>${r.status==='pending'?`<button class="btn green small" data-approve-faq="${i}">Approve</button> <button class="btn ghost small" data-reject-faq="${i}">Reject</button>`:'—'}</td></tr>`).join('');
+ document.querySelectorAll('[data-approve-faq]').forEach(b=>b.onclick=()=>{faqRows[+b.dataset.approveFaq].status='approved';renderFaqTable();updateFaqStats();showToast('FAQ approved and linked to verified data')});
+ document.querySelectorAll('[data-reject-faq]').forEach(b=>b.onclick=()=>{faqRows[+b.dataset.rejectFaq].status='rejected';renderFaqTable();updateFaqStats();showToast('FAQ proposal rejected')});
+}
+function updateFaqStats(){const pending=faqRows.filter(r=>r.status==='pending').length;byId('pendingCount').textContent=`${pending} pending`;byId('statFaqRate').textContent=`${38+(3-pending)*4}%`}
+const unanswered=['Is the section fully fenced?','What type of broadband is installed?','Can the owner provide a fridge?','Is overnight street noise an issue?'];
+function renderUnanswered(){byId('unansweredList').innerHTML=unanswered.map((q,i)=>`<div class="question-item"><strong>${escapeHtml(q)}</strong><span>${[11,4,3,2][i]} users asked · <a href="#" data-answer-unanswered="${i}" style="color:var(--blue);font-weight:900">answer now</a></span></div>`).join('');document.querySelectorAll('[data-answer-unanswered]').forEach(b=>b.onclick=e=>{e.preventDefault();showToast('Opened listing field / FAQ approval workflow')})}
+byId('simulateQuestion').onclick=()=>{faqRows.unshift({q:'Are lawns included in the rent?',e:'No verified answer yet',n:1,status:'pending'});renderFaqTable();updateFaqStats();byId('statEscalated').textContent='65';showToast('New question grouped and added to the review queue')};
+byId('completeData').onclick=()=>{byId('completenessValue').textContent='94%';byId('completenessBar').style.width='94%';showToast('Fencing status verified; dependent FAQs and cached answers invalidated')};
+renderFaqTable();renderUnanswered();
+
+// Architecture interaction
+const archInfo={
+ surfaces:['Three explicit chat scopes','Every request carries GLOBAL_SEARCH, LISTING_CHAT with property_id, or AGENT_CHAT with agent_id. This prevents cross-listing answers and keeps tool permissions clear.'],
+ router:['Deterministic pre-router','Button selections, exact actions, structured fields and approved FAQs bypass the LLM. Regex may validate exact formats, but it does not lead free-text understanding.'],
+ llm:['Low-cost language layer','The default model understands intent, indirect wording, follow-ups, typos and multi-part requests. It receives only relevant state and fields, not the whole listing and transcript.'],
+ fallback:['Stronger model fallback','A stronger model is used only when schema validation, missing entities or task complexity prove the default route is insufficient. The target fallback rate is below 5%.'],
+ tools:['Source-of-truth tools','Property, search, availability, booking, cancellation, callback, messaging and route-planning tools provide real data and actions.'],
+ validation:['Validation gate','Before display, the system checks scope, supported claims, tool success, current listing status, privacy and CTA relevance. Failed validation leads to clarification or human escalation—not invention.']
+};
+document.querySelectorAll('[data-arch]').forEach(n=>n.onclick=()=>{document.querySelectorAll('.arch-node').forEach(x=>x.classList.remove('active'));n.classList.add('active');const [h,p]=archInfo[n.dataset.arch];byId('architectureDetails').innerHTML=`<h3>${h}</h3><p>${p}</p>`});
+byId('resetArchitecture').onclick=()=>{document.querySelectorAll('.arch-node').forEach(x=>x.classList.remove('active'));byId('architectureDetails').innerHTML='<h3>Select a component</h3><p>Click any architecture block to see exactly what it does and why it improves both user experience and token cost.</p>'};
+byId('showRouting').onclick=()=>{switchSurface('architecture');setTimeout(()=>document.querySelector('[data-arch="router"]').click(),250)};
+
+// Automated tour
+const tourSteps=[
+ {surface:'global',id:'G01',text:'1 of 7 — A natural-language request becomes structured filters, live listings and viewing availability.'},
+ {surface:'global',id:'G08',text:'2 of 7 — The platform creates a realistic viewing route using actual times and travel buffers.'},
+ {surface:'listing',id:'L03',text:'3 of 7 — “Do I need to buy a bed?” is understood semantically, avoiding the current regex failure.'},
+ {surface:'listing',id:'L15',text:'4 of 7 — Live viewing slots come from the availability engine, not from the model.'},
+ {surface:'listing',id:'L17',text:'5 of 7 — Booking is confirmed only after the booking API succeeds.'},
+ {surface:'agent',id:'A08',text:'6 of 7 — AI information and a real human message are visibly separated.'},
+ {surface:'lister',id:null,text:'7 of 7 — Repeated questions become approved FAQs only after verification, saving agent time and token cost.'}
+];
+function runTourStep(){
+ if(tourIndex>=tourSteps.length){stopTour();showToast('Automated walkthrough complete');return}
+ const step=tourSteps[tourIndex];switchSurface(step.surface);byId('tourText').textContent=step.text;byId('tourProgress').style.width=`${((tourIndex+1)/tourSteps.length)*100}%`;if(step.id){const s=scenarios.find(x=>x.id===step.id);renderScenario(step.surface,s,{animate:true})}tourIndex++;tourTimer=setTimeout(runTourStep,4200)
+}
+function startTour(){stopTour(false);tourIndex=0;byId('tourBanner').classList.add('show');runTourStep()}
+function stopTour(hide=true){if(tourTimer)clearTimeout(tourTimer);tourTimer=null;if(hide)byId('tourBanner').classList.remove('show')}
+byId('startTour').onclick=startTour;byId('stopTour').onclick=()=>stopTour(true);
+
+// Close modal on backdrop
+[byId('scenarioModal'),byId('actionModal')].forEach(m=>m.addEventListener('click',e=>{if(e.target===m){m.classList.remove('open');document.body.classList.remove('no-scroll')}}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeScenarioModal();closeAction();stopTour(true)}});
+
+// Initial render
+renderScenario('global',defaultScenarios.global);
+renderScenario('listing',defaultScenarios.listing);
+renderScenario('agent',defaultScenarios.agent);
+renderScenarioLibrary();
+</script>
+</body>
+</html>
